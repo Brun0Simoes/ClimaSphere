@@ -1,0 +1,2490 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:#eef3f1;font-family:'IBM Plex Sans',system-ui,sans-serif;color:#0f2922;-webkit-font-smoothing:antialiased}
+  ::selection{background:#34d39955}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+  @keyframes ping{0%{transform:scale(1);opacity:.55}70%,100%{transform:scale(2.4);opacity:0}}
+  @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+  @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes sweep{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#cdddd6;border-radius:8px;border:2px solid transparent;background-clip:content-box}
+  .hero-globe{min-height:clamp(520px,76vh,760px)}
+  .hero-copy{max-width:min(390px,35vw)}
+  .hero-stat-strip{display:grid;grid-template-columns:repeat(2,minmax(118px,1fr));gap:14px 18px;max-width:330px}
+  .globe-canvas{position:absolute;top:0;right:auto;bottom:0;left:50%;width:auto;height:100%;transform:translateX(-50%);cursor:grab;touch-action:none}
+  .globe-truth-panel{position:absolute;right:clamp(16px,4vw,46px);top:clamp(218px,40vh,310px);z-index:4;width:min(270px,72vw);padding:14px 15px;border-radius:16px;background:#0a241cd9;backdrop-filter:blur(12px);border:1px solid #ffffff1f}
+  .metric-card{min-width:0}
+  .sat-meta-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}
+  .chart-footnote{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:8px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#7e9a8f}
+  @media (max-width:980px){
+    .hero-globe{min-height:780px}
+    .globe-canvas{left:50%;right:auto;top:245px;height:470px;width:auto;transform:translateX(-50%)}
+    .hero-copy{max-width:none;padding-bottom:0}
+    .hero-stat-strip{grid-template-columns:repeat(2,minmax(104px,1fr));max-width:100%}
+    .globe-truth-panel{left:clamp(18px,5vw,46px);right:auto;top:auto;bottom:96px;width:min(340px,86vw)}
+  }
+  @media (max-width:620px){
+    .hero-globe{min-height:900px;border-radius:20px}
+    .globe-canvas{top:350px;height:390px}
+    .sat-meta-grid{grid-template-columns:1fr}
+  }
+</style>
+</helmet>
+
+<div style="max-width:1480px;margin:0 auto;padding:0 clamp(14px,3vw,30px) 60px">
+
+  <header style="position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:12px 4px;margin:0 -4px 0;background:rgba(238,243,241,.82);backdrop-filter:blur(14px);border-bottom:1px solid #dde7e2">
+    <div style="display:flex;align-items:center;gap:12px;margin-right:auto">
+      <div style="position:relative;width:42px;height:42px;display:grid;place-items:center;border-radius:13px;background:radial-gradient(circle at 30% 25%,#0e3a2e,#061a14);box-shadow:0 6px 18px -6px rgba(6,26,20,.6)">
+        <div style="position:absolute;inset:0;border-radius:13px;border:1px solid #34d39955;animation:sweep 14s linear infinite"></div>
+        <div style="width:18px;height:18px;border-radius:50%;background:conic-gradient(from 0deg,#34d399,#22d3ee,#34d399);box-shadow:0 0 12px #34d399aa"></div>
+      </div>
+      <div style="line-height:1.05">
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;letter-spacing:-.02em">ClimaSphere</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#5b7a70">{{ ui.brandSub }}</div>
+      </div>
+    </div>
+    <nav style="display:flex;gap:4px;flex-wrap:wrap">
+      <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="5">
+        <a href="{{ n.href }}" style="font-size:13.5px;font-weight:500;color:#33524a;text-decoration:none;padding:8px 12px;border-radius:9px" style-hover="background:#dfeae5;color:#0f2922">{{ n.label }}</a>
+      </sc-for>
+    </nav>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="display:flex;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;border:1px solid #cfdcd6;border-radius:10px;overflow:hidden;background:#fff">
+        <button onClick="{{ setPt }}" style="{{ ptBtn }}">PT</button>
+        <button onClick="{{ setEn }}" style="{{ enBtn }}">EN</button>
+      </div>
+      <button onClick="{{ toggleNotif }}" style="position:relative;width:40px;height:40px;display:grid;place-items:center;border:1px solid #cfdcd6;border-radius:11px;background:#fff;cursor:pointer" style-hover="background:#f4f8f6">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#33524a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+        <span style="position:absolute;top:-5px;right:-5px;min-width:18px;height:18px;padding:0 4px;display:grid;place-items:center;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;color:#fff;background:#dc2626;border-radius:9px;border:2px solid #eef3f1">{{ alertCount }}</span>
+      </button>
+      <div style="display:none;align-items:center;gap:7px;padding:8px 13px;border:1px solid #cfdcd6;border-radius:11px;background:#fff" data-clock-wrap>
+        <span style="width:7px;height:7px;border-radius:50%;background:#16a34a;box-shadow:0 0 8px #16a34a;animation:blink 2s infinite"></span>
+        <span ref="{{ clockRef }}" style="font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:600;letter-spacing:.04em">--:--:-- UTC</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============ HERO / GLOBE ============ -->
+  <section id="globo" class="hero-globe" style="position:relative;scroll-margin-top:74px;margin-top:18px;border-radius:26px;overflow:hidden;background:radial-gradient(120% 130% at 80% -10%,#0d3328 0%,#08231b 45%,#061a14 100%);box-shadow:0 30px 80px -40px rgba(6,26,20,.7)">
+    <div style="position:absolute;inset:0;background-image:radial-gradient(circle at 18% 30%,#34d39922,transparent 38%),radial-gradient(circle at 88% 80%,#22d3ee18,transparent 42%);pointer-events:none"></div>
+    <div style="position:absolute;inset:0;opacity:.5;background-image:linear-gradient(#ffffff08 1px,transparent 1px),linear-gradient(90deg,#ffffff08 1px,transparent 1px);background-size:46px 46px;mask-image:radial-gradient(circle at 50% 45%,#000,transparent 75%);pointer-events:none"></div>
+
+    <!-- canvas globe -->
+    <canvas ref="{{ globeRef }}" class="globe-canvas"></canvas>
+    <!-- alert hover tooltip (positioned by JS) -->
+    <div ref="{{ globeTipRef }}" style="display:none;position:absolute;z-index:6;pointer-events:none;width:188px;padding:11px 13px;border-radius:13px;background:#0a241cf2;backdrop-filter:blur(10px);border:1px solid #ffffff24;box-shadow:0 18px 40px -18px #000"></div>
+
+    <!-- top hero copy -->
+    <div class="hero-copy" style="position:relative;z-index:3;padding:clamp(22px,4vw,46px);pointer-events:none">
+      <div style="display:inline-flex;align-items:center;gap:9px;padding:7px 13px;border:1px solid #ffffff26;border-radius:999px;background:#ffffff0d;backdrop-filter:blur(6px);pointer-events:auto">
+        <span style="width:7px;height:7px;border-radius:50%;background:#34d399;box-shadow:0 0 10px #34d399;animation:blink 1.8s infinite"></span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9fe9d3">{{ ui.heroKicker }}</span>
+      </div>
+      <h1 style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(30px,4.6vw,54px);line-height:1.02;letter-spacing:-.025em;color:#fff;margin:18px 0 0;text-wrap:balance">{{ ui.heroTitle }}</h1>
+      <p style="font-size:clamp(14px,1.4vw,17px);line-height:1.55;color:#bcd8cd;margin:16px 0 0;max-width:430px;text-wrap:pretty">{{ ui.heroSub }}</p>
+      <div class="hero-stat-strip" style="margin-top:26px;pointer-events:auto">
+        <sc-for list="{{ heroStats }}" as="s" hint-placeholder-count="4">
+          <div class="metric-card">
+            <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(22px,2.6vw,30px);color:#fff;line-height:1">{{ s.value }}</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#7fb6a4;margin-top:5px">{{ s.label }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <!-- live alert ticker (floating) -->
+    <div style="position:absolute;left:clamp(16px,4vw,46px);bottom:clamp(16px,3vw,34px);z-index:4;width:min(330px,80vw);padding:15px 16px;border-radius:18px;background:#0a241cd9;backdrop-filter:blur(12px);border:1px solid #ffffff1f;box-shadow:0 20px 50px -24px #000;animation:floaty 7s ease-in-out infinite">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:11px">
+        <span style="font-size:15px">⚠️</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:#fbbf24">{{ ui.liveAlert }}</span>
+        <span style="margin-left:auto;width:6px;height:6px;border-radius:50%;background:#fbbf24;animation:blink 1.4s infinite"></span>
+      </div>
+      <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:15px;color:#fff;line-height:1.2">{{ topAlert.headline }}</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:9px;font-size:11.5px;color:#9fc3b6">
+        <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:2px;background:{{ topAlert.color }}"></span>{{ topAlert.sevLabel }}</span>
+        <span style="opacity:.5">•</span><span>{{ topAlert.region }}</span>
+      </div>
+    </div>
+
+    <!-- globe controls (right) -->
+    <div style="position:absolute;right:clamp(14px,3vw,26px);top:clamp(80px,16vh,150px);z-index:4;display:flex;flex-direction:column;gap:9px">
+      <button onClick="{{ zoomIn }}" title="zoom in" style="width:42px;height:42px;display:grid;place-items:center;border:1px solid #ffffff26;border-radius:12px;background:#0a241ccc;backdrop-filter:blur(8px);cursor:pointer;color:#cdeee0;font-size:20px;font-weight:600" style-hover="background:#10362a">+</button>
+      <button onClick="{{ zoomOut }}" title="zoom out" style="width:42px;height:42px;display:grid;place-items:center;border:1px solid #ffffff26;border-radius:12px;background:#0a241ccc;backdrop-filter:blur(8px);cursor:pointer;color:#cdeee0;font-size:20px;font-weight:600" style-hover="background:#10362a">−</button>
+      <button onClick="{{ resetGlobe }}" title="reset" style="width:42px;height:42px;display:grid;place-items:center;border:1px solid #ffffff26;border-radius:12px;background:#0a241ccc;backdrop-filter:blur(8px);cursor:pointer;color:#cdeee0" style-hover="background:#10362a">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+      </button>
+    </div>
+
+    <!-- data truth on the globe -->
+    <div class="globe-truth-panel">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span style="width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 10px #34d399"></span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:#9fe9d3">{{ ui.globeTruth }}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <sc-for list="{{ globeTruth }}" as="g" hint-placeholder-count="4">
+          <div style="display:flex;align-items:center;gap:9px">
+            <span style="width:8px;height:8px;border-radius:50%;background:{{ g.color }};box-shadow:0 0 10px {{ g.color }}"></span>
+            <span style="min-width:0;flex:1;font-size:11.5px;color:#cdeee0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ g.label }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#fff">{{ g.value }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:#7fb6a4;line-height:1.35">{{ globeTruthNote }}</div>
+    </div>
+
+    <!-- legend (floating right-bottom) -->
+    <div style="position:absolute;right:clamp(16px,4vw,46px);bottom:clamp(16px,3vw,34px);z-index:4;width:min(230px,72vw);padding:14px 15px;border-radius:16px;background:#0a241cd9;backdrop-filter:blur(12px);border:1px solid #ffffff1f">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px">
+        <span style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13px;color:#fff">{{ activeLayerName }}</span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#7fb6a4">{{ activeLayerUnit }}</span>
+      </div>
+      <div style="height:11px;border-radius:6px;background:{{ legendGradient }};box-shadow:inset 0 0 0 1px #ffffff22"></div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#9fc3b6">
+        <span>{{ legendMin }}</span><span>{{ legendMax }}</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TIME-DIMENSION PLAYER (DSAT-style) ============ -->
+  <section style="margin-top:14px;border-radius:18px;background:linear-gradient(120deg,#08231b,#0c3528);border:1px solid #103a2d;box-shadow:0 18px 44px -30px rgba(6,26,20,.7);padding:14px clamp(14px,2.4vw,22px);display:flex;flex-direction:column;gap:14px">
+   <!-- top row: transport + timestamp + scrubber -->
+   <div style="display:flex;align-items:center;gap:clamp(12px,2vw,22px);flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:8px">
+      <button onClick="{{ stepBack }}" title="prev" style="width:38px;height:38px;display:grid;place-items:center;border:1px solid #ffffff22;border-radius:10px;background:#ffffff0d;color:#cdeee0;cursor:pointer" style-hover="background:#ffffff18">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M7 6h2v12H7zM20 6 11 12l9 6z"/></svg>
+      </button>
+      <button onClick="{{ togglePlay }}" title="play/pause" style="width:46px;height:46px;display:grid;place-items:center;border:none;border-radius:12px;background:#34d399;color:#052017;cursor:pointer;font-size:17px;box-shadow:0 8px 20px -10px #34d399aa" style-hover="background:#5ee0b0">{{ playIcon }}</button>
+      <button onClick="{{ stepFwd }}" title="next" style="width:38px;height:38px;display:grid;place-items:center;border:1px solid #ffffff22;border-radius:10px;background:#ffffff0d;color:#cdeee0;cursor:pointer" style-hover="background:#ffffff18">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M15 6h2v12h-2zM4 6l9 6-9 6z"/></svg>
+      </button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:2px;min-width:132px">
+      <div style="display:flex;align-items:center;gap:7px">
+        <span style="width:7px;height:7px;border-radius:50%;background:#34d399;box-shadow:0 0 8px #34d399;animation:blink 1.6s infinite"></span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:{{ liveColor }}">{{ liveBadge }}</span>
+      </div>
+      <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:22px;color:#fff;line-height:1;letter-spacing:-.01em">{{ liveStamp }}</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#7fb6a4">{{ liveSourceLine }}</span>
+    </div>
+    <div style="flex:1;min-width:200px">
+      <input type="range" min="0" max="{{ playerFrames }}" step="1" value="{{ playerVal }}" onInput="{{ onFrame }}" style="width:100%;accent-color:#34d399;cursor:pointer">
+      <div style="display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:#6f9c8d;margin-top:3px">
+        <span>{{ ui.start }}</span><span style="color:#34d399">{{ ui.current }}</span><span>{{ ui.end }}</span>
+      </div>
+    </div>
+   </div>
+   <!-- bottom row: período/frequência + resolução + opacidade + densidade de vento -->
+   <div style="display:flex;align-items:flex-start;gap:clamp(14px,2.4vw,26px);flex-wrap:wrap;border-top:1px solid #ffffff12;padding-top:13px">
+    <div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#7fb6a4;margin-bottom:6px">{{ ui.periodFreq }}</div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;max-width:330px">
+        <sc-for list="{{ periodView }}" as="p" hint-placeholder-count="7">
+          <button onClick="{{ p.onClick }}" style="{{ p.style }}">{{ p.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+    <div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#7fb6a4;margin-bottom:6px">{{ ui.resolution }}</div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <sc-for list="{{ resView }}" as="r" hint-placeholder-count="6">
+          <button onClick="{{ r.onClick }}" style="{{ r.style }}">{{ r.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+    <div style="min-width:140px">
+      <div style="display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#7fb6a4;margin-bottom:6px"><span>{{ ui.opacity }}</span><span style="color:#cdeee0">{{ opacity }}%</span></div>
+      <input type="range" min="0" max="100" step="5" value="{{ opacity }}" onInput="{{ onOpacity }}" style="width:100%;accent-color:#22d3ee;cursor:pointer">
+    </div>
+    <sc-if value="{{ windOn }}" hint-placeholder-val="{{ true }}">
+      <div style="min-width:150px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#7fb6a4;margin-bottom:6px">{{ ui.windDensity }}</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <sc-for list="{{ windDensView }}" as="d" hint-placeholder-count="4">
+            <button onClick="{{ d.onClick }}" style="{{ d.style }}">{{ d.label }}</button>
+          </sc-for>
+        </div>
+        <div style="height:8px;border-radius:5px;margin-top:8px;background:linear-gradient(90deg,#4575b4,#74add1,#abd9e9,#e0f3f8,#fee090,#fdae61,#f46d43,#a50026)"></div>
+        <div style="display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:8.5px;color:#7fb6a4;margin-top:2px"><span>0</span><span>10</span><span>20</span><span>30+ m/s</span></div>
+      </div>
+    </sc-if>
+   </div>
+  </section>
+
+  <!-- ============ LAYER SWITCHER ============ -->
+  <section style="margin-top:18px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:#5b7a70">{{ ui.layersTitle }}</span>
+      <span style="flex:1;height:1px;background:#dde7e2;min-width:30px"></span>
+    </div>
+    <div style="display:flex;gap:9px;flex-wrap:wrap">
+      <sc-for list="{{ layersView }}" as="l" hint-placeholder-count="9">
+        <button onClick="{{ l.onClick }}" style="{{ l.style }}">
+          <span style="width:11px;height:11px;border-radius:3px;background:{{ l.swatch }};box-shadow:0 0 0 1px #00000010"></span>
+          <span>{{ l.name }}</span>
+        </button>
+      </sc-for>
+    </div>
+  </section>
+
+  <!-- ============ DASHBOARD GRID ============ -->
+  <section id="dashpanels" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:18px;margin-top:24px;align-items:start">
+
+    <!-- CAP ALERTS -->
+    <div id="alertas" style="scroll-margin-top:74px;background:#fff;border:1px solid #e3ece8;border-radius:18px;box-shadow:0 1px 2px rgba(6,26,20,.04),0 14px 30px -22px rgba(6,26,20,.4);overflow:hidden;display:flex;flex-direction:column">
+      <div style="padding:18px 18px 14px;border-bottom:1px solid #eef3f1">
+        <div style="display:flex;align-items:center;gap:9px">
+          <span style="width:9px;height:9px;border-radius:50%;background:#dc2626;box-shadow:0 0 0 4px #dc262618;animation:blink 1.6s infinite"></span>
+          <h3 style="margin:0;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:16px">{{ ui.alertsTitle }}</h3>
+          <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8aa399">CAP 1.2</span>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:13px">
+          <sc-for list="{{ sevChips }}" as="c" hint-placeholder-count="5">
+            <button onClick="{{ c.onClick }}" style="{{ c.style }}">{{ c.label }}<span style="font-family:'IBM Plex Mono',monospace;opacity:.7">{{ c.count }}</span></button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="max-height:360px;overflow-y:auto;padding:8px">
+        <sc-for list="{{ alertsView }}" as="a" hint-placeholder-count="5">
+          <button onClick="{{ a.onClick }}" style="display:flex;gap:12px;width:100%;text-align:left;padding:12px;border:1px solid transparent;border-radius:13px;background:transparent;cursor:pointer" style-hover="background:#f6faf8;border-color:#e3ece8">
+            <div style="flex-shrink:0;width:42px;height:42px;border-radius:11px;display:grid;place-items:center;font-size:19px;background:{{ a.tint }}">{{ a.icon }}</div>
+            <div style="min-width:0;flex:1">
+              <div style="display:flex;align-items:center;gap:7px">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#fff;background:{{ a.color }};padding:2px 6px;border-radius:5px">{{ a.sevLabel }}</span>
+                <span style="font-size:11px;color:#8aa399;font-family:'IBM Plex Mono',monospace">{{ a.ago }}</span>
+              </div>
+              <div style="font-weight:600;font-size:13.5px;margin-top:5px;line-height:1.25;color:#16312a">{{ a.headline }}</div>
+              <div style="font-size:11.5px;color:#6c8a7f;margin-top:3px;display:flex;align-items:center;gap:5px">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11Z"/><circle cx="12" cy="10" r="2.4"/></svg>
+                {{ a.region }} · {{ a.area }}
+              </div>
+            </div>
+          </button>
+        </sc-for>
+      </div>
+    </div>
+
+    <!-- NOWCAST TIMELINE -->
+    <div id="previsao" style="scroll-margin-top:74px;background:#fff;border:1px solid #e3ece8;border-radius:18px;box-shadow:0 1px 2px rgba(6,26,20,.04),0 14px 30px -22px rgba(6,26,20,.4);padding:18px;display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+        <h3 style="margin:0;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:16px">{{ ui.nowcastTitle }}</h3>
+      </div>
+      <!-- location search: city / state / country -->
+      <div style="position:relative;margin-top:12px">
+        <div style="display:flex;align-items:center;gap:8px;background:#f4f8f6;border:1px solid #cfdcd6;border-radius:11px;padding:9px 12px">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7e9a8f" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <input value="{{ nowcastQuery }}" onInput="{{ onNowcastQuery }}" placeholder="{{ ui.searchPlaceholder }}" style="border:none;background:transparent;outline:none;font-family:'IBM Plex Sans',sans-serif;font-size:13px;color:#16312a;flex:1;min-width:0" />
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#2a8c66;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis">📍 {{ nowcastCity }}</span>
+        </div>
+        <sc-if value="{{ hasGeoResults }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;left:0;right:0;top:46px;z-index:30;background:#fff;border:1px solid #cfdcd6;border-radius:12px;box-shadow:0 18px 40px -18px rgba(6,26,20,.45);overflow:hidden">
+            <sc-for list="{{ geoResults }}" as="g" hint-placeholder-count="5">
+              <button onClick="{{ g.onClick }}" style="display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:10px 13px;border:none;border-bottom:1px solid #eef3f1;background:#fff;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;color:#16312a" style-hover="background:#f4f8f6">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#2a8c66" stroke-width="2.2"><path d="M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11Z"/><circle cx="12" cy="10" r="2.4"/></svg>
+                {{ g.label }}
+              </button>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+      <!-- quick picks -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:9px">
+        <sc-for list="{{ cityOptions }}" as="c" hint-placeholder-count="6">
+          <button onClick="{{ c.onClick }}" style="padding:5px 10px;border-radius:8px;cursor:pointer;font-size:11px;font-weight:500;font-family:'IBM Plex Sans',sans-serif;background:#f4f8f6;color:#5b7a70;border:1px solid #e3ece8" style-hover="background:#dfeae5;color:#0f2922">{{ c.label }}</button>
+        </sc-for>
+      </div>
+      <!-- specific-date query -->
+      <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid #eef3f1">
+        <span style="font-size:12px;color:#6c8a7f;font-weight:500">{{ ui.dateTitle }}</span>
+        <input type="date" min="{{ minDate }}" max="{{ maxDate }}" onInput="{{ onForecastDate }}" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#16312a;background:#f4f8f6;border:1px solid #cfdcd6;border-radius:9px;padding:6px 10px;cursor:pointer" />
+      </div>
+      <sc-if value="{{ hasDayCard }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:10px;border:1px solid #e3ece8;border-radius:14px;overflow:hidden;background:#f9fcfb">
+          <sc-if value="{{ dayCard.loading }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:16px;font-size:12.5px;color:#6c8a7f;display:flex;align-items:center;gap:8px"><span style="width:14px;height:14px;border:2px solid #cfdcd6;border-top-color:#2a8c66;border-radius:50%;animation:spin .8s linear infinite"></span>{{ ui.dateLoading }}</div>
+          </sc-if>
+          <sc-if value="{{ dayCard.ok }}" hint-placeholder-val="{{ false }}">
+            <div>
+              <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#eef5f1">
+                <div style="font-size:30px">{{ dayCard.icon }}</div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;color:#16312a">{{ dayCard.dateLabel }} · {{ dayCard.cond }}</div>
+                  <div style="font-size:11px;color:#6c8a7f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ dayCard.place }}</div>
+                </div>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:#fff;background:#2a8c66;padding:3px 8px;border-radius:6px">{{ dayCard.tag }}</span>
+              </div>
+              <div style="padding:4px 16px 12px">
+                <sc-for list="{{ dayCard.rows }}" as="r" hint-placeholder-count="5">
+                  <div style="display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid #eef3f1">
+                    <span style="font-size:12px;color:#6c8a7f">{{ r.k }}</span>
+                    <span style="font-size:12.5px;font-weight:600;color:#16312a;text-align:right">{{ r.v }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ dayCardEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:16px;font-size:12.5px;color:#a05a2a;line-height:1.4">{{ dayCard.message }}</div>
+          </sc-if>
+        </div>
+      </sc-if>
+      <!-- current readout -->
+      <div style="display:flex;align-items:flex-end;gap:16px;margin:18px 0 4px;flex-wrap:wrap">
+        <div style="font-size:46px;line-height:1">{{ nc.icon }}</div>
+        <div>
+          <div style="display:flex;align-items:baseline;gap:8px">
+            <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:44px;letter-spacing:-.03em;line-height:.9">{{ nc.temp }}°</span>
+            <span style="font-size:13px;color:#6c8a7f">{{ nc.cond }}</span>
+          </div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#2a8c66;margin-top:6px">{{ ui.rainProb }} {{ nc.pop }}% · {{ ui.wind }} {{ nc.wind }} m/s</div>
+        </div>
+        <div style="margin-left:auto;text-align:right">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:#0f2922">{{ nc.label }}</div>
+          <div style="font-size:10.5px;color:#8aa399;text-transform:uppercase;letter-spacing:.08em">{{ ui.forecastFor }}</div>
+        </div>
+      </div>
+      <!-- mini hourly chart -->
+      <div style="display:flex;align-items:flex-end;gap:3px;height:64px;margin-top:14px">
+        <sc-for list="{{ nowcastBars }}" as="b" hint-placeholder-count="12">
+          <div onClick="{{ b.onClick }}" style="flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;cursor:pointer;border-radius:5px" style-hover="background:#f1f7f4">
+            <div style="height:{{ b.popH }}%;border-radius:4px 4px 0 0;background:linear-gradient(#7cc6ff,#3b82f6);opacity:.35;min-height:2px"></div>
+            <div style="{{ b.tempDot }}"></div>
+          </div>
+        </sc-for>
+      </div>
+      <!-- slider -->
+      <input type="range" min="0" max="11" step="1" value="{{ timelineHour }}" onInput="{{ onTimeline }}" style="width:100%;margin-top:14px;accent-color:#16a34a;cursor:pointer">
+      <div style="display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:#9fb6ab;margin-top:2px">
+        <span>{{ ui.now }}</span><span>+6h</span><span>+11h</span>
+      </div>
+    </div>
+
+    <!-- SATELLITE / ACTIVE LAYER VIEW -->
+    <div style="background:#fff;border:1px solid #e3ece8;border-radius:18px;box-shadow:0 1px 2px rgba(6,26,20,.04),0 14px 30px -22px rgba(6,26,20,.4);padding:18px">
+      <div style="display:flex;align-items:center;gap:9px;margin-bottom:14px">
+        <h3 style="margin:0;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:16px">{{ ui.satTitle }}</h3>
+        <span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#8aa399">{{ satCardKicker }}</span>
+      </div>
+      <div style="position:relative;border-radius:14px;overflow:hidden;background:#06140f;aspect-ratio:16/10">
+        <canvas ref="{{ satRef }}" style="position:absolute;inset:0;width:100%;height:100%"></canvas>
+        <div style="position:absolute;left:10px;top:10px;max-width:calc(100% - 20px);font-family:'IBM Plex Mono',monospace;font-size:10px;line-height:1.35;color:#bfe9d8;background:#00000066;padding:4px 7px;border-radius:6px">{{ satLabel }}</div>
+        <div style="position:absolute;right:10px;bottom:10px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#bfe9d8;background:#00000055;padding:3px 7px;border-radius:6px">{{ nc.label }}</div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6c8a7f">
+        <span>{{ satStatus }}</span>
+        <span>{{ satRange }}</span>
+      </div>
+      <div class="sat-meta-grid">
+        <sc-for list="{{ satMeta }}" as="m" hint-placeholder-count="3">
+          <div style="flex:1;padding:11px;border-radius:11px;background:#f4f8f6;border:1px solid #eaf1ee">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:#7e9a8f">{{ m.label }}</div>
+            <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:18px;margin-top:3px;color:#16312a">{{ m.value }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <!-- TREND CHARTS -->
+    <div style="background:#fff;border:1px solid #e3ece8;border-radius:18px;box-shadow:0 1px 2px rgba(6,26,20,.04),0 14px 30px -22px rgba(6,26,20,.4);padding:18px">
+      <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px">
+        <h3 style="margin:0;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:16px">{{ ui.trendsTitle }}</h3>
+        <span style="margin-left:auto;font-size:11.5px;color:#8aa399;text-align:right">{{ trendStatus }}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;margin:6px 0 4px;font-size:11.5px;font-family:'IBM Plex Mono',monospace">
+        <span style="display:inline-flex;align-items:center;gap:6px;color:#e0532a"><span style="width:12px;height:3px;border-radius:2px;background:#f97316"></span>{{ ui.tempTrend }}</span>
+        <span style="display:inline-flex;align-items:center;gap:6px;color:#2563eb"><span style="width:12px;height:9px;border-radius:2px;background:#93c5fd"></span>{{ ui.precipTrend }}</span>
+      </div>
+      <div onMouseLeave="{{ onTrendLeave }}" style="position:relative;width:100%;height:150px;margin-top:8px;overflow:visible">
+        <canvas ref="{{ trendRef }}" width="640" height="300" style="position:absolute;inset:0;width:100%;height:150px;display:block"></canvas>
+        <sc-if value="{{ trendHoverCol }}" hint-placeholder-val="{{ false }}">
+          <div style="{{ trendHoverCol.lineStyle }}"></div>
+          <div style="{{ trendHoverCol.dotStyle }}"></div>
+          <div style="{{ trendHoverCol.tipStyle }}">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.04em;color:#cdeee0">{{ trendHoverCol.date }}</div>
+            <div style="display:flex;align-items:center;gap:7px;margin-top:7px;color:#fff;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:11px"><span style="width:7px;height:7px;border-radius:50%;background:#f97316"></span>{{ trendHoverCol.temp }}</div>
+            <div style="display:flex;align-items:center;gap:7px;margin-top:5px;color:#fff;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:11px"><span style="width:8px;height:8px;border-radius:2px;background:#93c5fd"></span>{{ trendHoverCol.precip }}</div>
+          </div>
+        </sc-if>
+        <sc-for list="{{ trendCols }}" as="c" hint-placeholder-count="14">
+          <div onMouseEnter="{{ c.onEnter }}" style="{{ c.hitStyle }}"></div>
+        </sc-for>
+      </div>
+      <div class="chart-footnote">
+        <span>{{ nowcastCity }}</span>
+        <span>{{ trendLegendNote }}</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ REGIONAL TEMPERATURE STRIP ============ -->
+  <section style="margin-top:24px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:13px">
+      <h3 style="margin:0;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:18px">{{ ui.regionsTitle }}</h3>
+      <span style="font-size:12px;color:#8aa399">{{ ui.regionsSub }}</span>
+      <span style="flex:1;height:1px;background:#dde7e2;min-width:30px"></span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:14px">
+      <sc-for list="{{ regionsView }}" as="r" hint-placeholder-count="8">
+        <div style="position:relative;overflow:hidden;border-radius:16px;padding:15px;background:{{ r.bg }};border:1px solid #e3ece8;box-shadow:0 10px 24px -20px rgba(6,26,20,.5)">
+          <div style="position:absolute;right:-14px;top:-14px;font-size:64px;opacity:.16;transform:rotate(-8deg)">{{ r.icon }}</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#6c8a7f">{{ r.zone }}</div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:15px;margin-top:2px;color:#16312a">{{ r.city }}</div>
+          <div style="display:flex;align-items:baseline;gap:4px;margin-top:12px">
+            <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:34px;letter-spacing:-.03em;color:#0f2922">{{ r.tempText }}</span>
+            <span style="font-size:12px;color:#8aa399">{{ r.cond }}</span>
+          </div>
+          <div style="display:flex;gap:12px;margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#6c8a7f">
+            <span>↑{{ r.hiText }}</span><span>↓{{ r.loText }}</span><span style="color:{{ r.trendColor }}">{{ r.trend }}</span>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <!-- ============ INDICES + WIND/PRESSURE ============ -->
+  <section style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px;margin-top:24px">
+    <!-- UV gauge -->
+    <div style="background:#fff;border:1px solid #e3ece8;border-radius:18px;padding:18px;box-shadow:0 1px 2px rgba(6,26,20,.04),0 14px 30px -22px rgba(6,26,20,.4)">
+      <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:15px;margin-bottom:14px">{{ ui.uvTitle }}</div>
+      <div style="display:flex;align-items:center;gap:16px">
+        <svg width="96" height="96" viewBox="0 0 100 100" style="flex-shrink:0">
+          <circle cx="50" cy="50" r="40" fill="none" stroke="#eef3f1" stroke-width="11"/>
+          <circle cx="50" cy="50" r="40" fill="none" stroke="{{ uv.color }}" stroke-width="11" stroke-linecap="round" stroke-dasharray="{{ uv.dash }}" transform="rotate(-90 50 50)"/>
+        </svg>
+        <div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:34px;line-height:1;color:{{ uv.color }}">{{ uv.value }}</div>
+          <div style="font-weight:600;font-size:13px;margin-top:4px;color:#16312a">{{ uv.label }}</div>
+          <div style="font-size:11.5px;color:#6c8a7f;margin-top:4px;max-width:120px;text-wrap:pretty">{{ uv.advice }}</div>
+        </div>
+      </div>
+    </div>
+    <!-- AQI gauge -->
+    <div style="background:#fff;border:1px solid #e3ece8;border-radius:18px;padding:18px;box-shadow:0 1px 2px rgba(6,26,20,.04),0 14px 30px -22px rgba(6,26,20,.4)">
+      <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:15px;margin-bottom:14px">{{ ui.aqiTitle }}</div>
+      <div style="display:flex;align-items:center;gap:16px">
+        <svg width="96" height="96" viewBox="0 0 100 100" style="flex-shrink:0">
+          <circle cx="50" cy="50" r="40" fill="none" stroke="#eef3f1" stroke-width="11"/>
+          <circle cx="50" cy="50" r="40" fill="none" stroke="{{ aqi.color }}" stroke-width="11" stroke-linecap="round" stroke-dasharray="{{ aqi.dash }}" transform="rotate(-90 50 50)"/>
+        </svg>
+        <div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:34px;line-height:1;color:{{ aqi.color }}">{{ aqi.value }}</div>
+          <div style="font-weight:600;font-size:13px;margin-top:4px;color:#16312a">{{ aqi.label }}</div>
+          <div style="font-size:11.5px;color:#6c8a7f;margin-top:4px">PM2.5 {{ aqi.pm }} µg/m³</div>
+        </div>
+      </div>
+    </div>
+    <!-- Wind -->
+    <div style="background:#fff;border:1px solid #e3ece8;border-radius:18px;padding:18px;box-shadow:0 1px 2px rgba(6,26,20,.04),0 14px 30px -22px rgba(6,26,20,.4)">
+      <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:15px;margin-bottom:14px">{{ ui.windTitle }}</div>
+      <div style="display:flex;align-items:center;gap:16px">
+        <div style="position:relative;width:88px;height:88px;flex-shrink:0;border-radius:50%;border:1px solid #e3ece8;display:grid;place-items:center">
+          <span style="position:absolute;top:5px;font-family:'IBM Plex Mono',monospace;font-size:9px;color:#8aa399">N</span>
+          <div ref="{{ windRef }}" style="font-size:30px;transition:transform .6s ease">🧭</div>
+        </div>
+        <div>
+          <div style="display:flex;align-items:baseline;gap:5px"><span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:30px;color:#0f2922">{{ nc.wind }}</span><span style="font-size:12px;color:#8aa399">m/s</span></div>
+          <div style="font-weight:600;font-size:13px;margin-top:4px;color:#16312a">{{ windDir }}</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6c8a7f;margin-top:4px">{{ ui.gust }} {{ gust }} m/s</div>
+        </div>
+      </div>
+    </div>
+    <!-- Pressure -->
+    <div style="background:#fff;border:1px solid #e3ece8;border-radius:18px;padding:18px;box-shadow:0 1px 2px rgba(6,26,20,.04),0 14px 30px -22px rgba(6,26,20,.4)">
+      <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:15px;margin-bottom:14px">{{ ui.pressTitle }}</div>
+      <div style="display:flex;align-items:baseline;gap:6px">
+        <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:30px;color:#0f2922">{{ pressure }}</span>
+        <span style="font-size:12px;color:#8aa399">hPa</span>
+        <span style="margin-left:auto;font-size:12px;color:{{ pressDeltaColor }};font-family:'IBM Plex Mono',monospace">{{ pressDeltaLabel }}</span>
+      </div>
+      <canvas ref="{{ pressRef }}" width="440" height="120" style="width:100%;height:60px;display:block;margin-top:14px"></canvas>
+      <div style="font-size:11.5px;color:#6c8a7f;margin-top:6px">{{ pressNoteDyn }}</div>
+    </div>
+  </section>
+
+  <!-- ============ CLIMWEB OPERATIONS ============ -->
+  <section id="dados" style="scroll-margin-top:74px;margin-top:24px;border-radius:22px;overflow:hidden;background:linear-gradient(120deg,#08231b,#0c3528);border:1px solid #103a2d;box-shadow:0 28px 70px -42px rgba(6,26,20,.8)">
+    <div id="climweb" style="scroll-margin-top:74px;padding:clamp(22px,3vw,34px)">
+      <div style="max-width:820px;margin-bottom:20px">
+        <div style="display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;border:1px solid #ffffff22;background:#ffffff0a">
+          <span style="width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 10px #34d399;animation:blink 1.8s infinite"></span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:#9fe9d3">{{ ui.climwebTag }}</span>
+        </div>
+        <h3 style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:clamp(23px,2.7vw,34px);color:#fff;margin:14px 0 0;letter-spacing:-.02em;line-height:1.04">{{ ui.climwebTitle }}</h3>
+        <p style="color:#a9ccc0;font-size:14px;line-height:1.55;margin:10px 0 0;max-width:780px;text-wrap:pretty">{{ ui.climwebSub }}</p>
+      </div>
+
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#7fb6a4;margin:4px 0 10px">{{ ui.portalNowTitle }}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(235px,100%),1fr));gap:12px">
+        <sc-for list="{{ portalLiveCards }}" as="card" hint-placeholder-count="9">
+          <div style="{{ card.style }}">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:#ffffff12;border:1px solid #ffffff12;font-size:17px">{{ card.icon }}</div>
+              <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14.5px;line-height:1.15;color:#fff">{{ card.title }}</div>
+            </div>
+            <p style="margin:0;color:#a9ccc0;font-size:12.5px;line-height:1.45;text-wrap:pretty">{{ card.body }}</p>
+            <sc-if value="{{ card.hasMetric }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;align-items:baseline;gap:6px">
+                <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:19px;color:#dff8ec">{{ card.metric }}</span>
+                <span style="font-family:'IBM Plex Sans',sans-serif;font-size:11.5px;color:#7fb6a4">{{ card.metricLabel }}</span>
+              </div>
+            </sc-if>
+            <button onClick="{{ card.onClick }}" style="{{ card.btnStyle }}" style-hover="filter:brightness(1.08)">{{ card.action }}</button>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#7fb6a4;margin:22px 0 10px">{{ ui.portalExploreTitle }}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(215px,100%),1fr));gap:12px">
+        <sc-for list="{{ portalNavGroups }}" as="g" hint-placeholder-count="4">
+          <div style="padding:14px;border-radius:16px;background:#ffffff08;border:1px solid #ffffff14">
+            <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13.5px;color:#fff;margin-bottom:9px">{{ g.title }}</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <sc-for list="{{ g.links }}" as="lnk" hint-placeholder-count="6">
+                <button onClick="{{ lnk.onClick }}" style="{{ lnk.style }}" style-hover="background:#ffffff12">
+                  <span style="min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ lnk.label }}</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#7fa295">{{ lnk.tag }}</span>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#7fb6a4;margin:22px 0 10px">{{ ui.portalSupportTitle }}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(215px,100%),1fr));gap:12px">
+        <sc-for list="{{ portalSupportCards }}" as="card" hint-placeholder-count="6">
+          <div style="{{ card.style }}">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="width:36px;height:36px;border-radius:11px;display:grid;place-items:center;background:#ffffff12;border:1px solid #ffffff12;font-size:16px">{{ card.icon }}</div>
+              <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;color:#fff">{{ card.title }}</div>
+            </div>
+            <p style="margin:0;color:#a9ccc0;font-size:12.5px;line-height:1.45">{{ card.body }}</p>
+            <button onClick="{{ card.onClick }}" style="{{ card.btnStyle }}" style-hover="filter:brightness(1.06)">{{ card.action }}</button>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;margin-top:22px;padding:13px 15px;border-radius:14px;background:#061a14aa;border:1px solid #ffffff14">
+        <span style="width:9px;height:9px;border-radius:50%;background:{{ portalStatus.color }};box-shadow:0 0 10px {{ portalStatus.color }};animation:blink 2.2s infinite"></span>
+        <span style="font-size:12.5px;color:#cdeee0;line-height:1.4">{{ portalStatus.text }}</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FOOTER ============ -->
+  <footer style="margin-top:30px;padding-top:24px;border-top:1px solid #dde7e2;display:flex;gap:18px;flex-wrap:wrap;align-items:center">
+    <div style="display:flex;align-items:center;gap:11px">
+      <div style="width:30px;height:30px;border-radius:9px;background:radial-gradient(circle at 30% 25%,#0e3a2e,#061a14);display:grid;place-items:center"><div style="width:13px;height:13px;border-radius:50%;background:conic-gradient(from 0deg,#34d399,#22d3ee,#34d399)"></div></div>
+      <span style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px">ClimaSphere</span>
+    </div>
+    <p style="margin:0;font-size:11.5px;color:#7e9a8f;max-width:560px;line-height:1.5;text-wrap:pretty">{{ ui.footerNote }}</p>
+    <div style="margin-left:auto;display:flex;gap:7px;flex-wrap:wrap">
+      <sc-for list="{{ sources }}" as="s" hint-placeholder-count="4">
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#6c8a7f;padding:5px 10px;border-radius:7px;background:#fff;border:1px solid #e3ece8">{{ s }}</span>
+      </sc-for>
+    </div>
+  </footer>
+
+  <!-- ============ ALERT DETAIL MODAL ============ -->
+  <sc-if value="{{ alertDetail }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeAlert }}" style="position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(6,26,20,.55);backdrop-filter:blur(4px)">
+      <div onClick="{{ stopProp }}" style="width:min(440px,94vw);max-height:88vh;overflow-y:auto;background:#fff;border-radius:20px;box-shadow:0 40px 90px -30px rgba(6,26,20,.7);animation:rise .22s ease">
+        <div style="position:relative;padding:22px 22px 16px;background:{{ alertDetail.tint }};border-radius:20px 20px 0 0">
+          <button onClick="{{ closeAlert }}" style="position:absolute;top:14px;right:14px;width:32px;height:32px;display:grid;place-items:center;border:none;border-radius:9px;background:#ffffffcc;cursor:pointer;font-size:16px;color:#33524a" style-hover="background:#fff">✕</button>
+          <div style="display:flex;align-items:center;gap:13px">
+            <div style="width:52px;height:52px;border-radius:14px;display:grid;place-items:center;font-size:26px;background:#ffffffcc">{{ alertDetail.icon }}</div>
+            <div>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#fff;background:{{ alertDetail.color }};padding:3px 8px;border-radius:6px">{{ alertDetail.sevLabel }}</span>
+              <div style="font-size:12px;color:#5b7a70;margin-top:6px;display:flex;align-items:center;gap:5px">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 21s-7-6.3-7-11a7 7 0 0 1 14 0c0 4.7-7 11-7 11Z"/><circle cx="12" cy="10" r="2.4"/></svg>
+                {{ alertDetail.region }}
+              </div>
+            </div>
+          </div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:18px;color:#16312a;margin-top:14px;line-height:1.2">{{ alertDetail.headline }}</div>
+        </div>
+        <div style="padding:8px 22px 14px">
+          <sc-for list="{{ alertDetail.rows }}" as="r" hint-placeholder-count="6">
+            <div style="display:flex;justify-content:space-between;gap:14px;padding:10px 0;border-bottom:1px solid #eef3f1">
+              <span style="font-size:12.5px;color:#6c8a7f">{{ r.k }}</span>
+              <span style="font-size:12.5px;font-weight:600;color:#16312a;text-align:right">{{ r.v }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <sc-if value="{{ alertDetail.url }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:0 22px 22px">
+            <a href="{{ alertDetail.url }}" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border-radius:12px;background:#0f2922;color:#fff;text-decoration:none;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13.5px" style-hover="background:#16312a">
+              {{ alertDetail.urlLabel }}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>
+            </a>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:&quot;100%&quot;,&quot;height&quot;:1400}}">
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.globeRef = React.createRef();
+    this.globeTipRef = React.createRef();
+    this.satRef = React.createRef();
+    this.trendRef = React.createRef();
+    this.pressRef = React.createRef();
+    this.clockRef = React.createRef();
+    this.rotIconRef = React.createRef();
+    this.windRef = React.createRef();
+    let cached=null; try{ cached=JSON.parse(localStorage.getItem('climasphere_live_v1')||'null'); }catch(e){}
+    const climweb0 = {climwebOverview:null, climwebStatus:null, climwebForecast:null, climwebRasters:null, climwebBoundaries:null, climwebStations:null, climwebCap:null, climwebErrors:null, climwebUpdated:null, externalAlerts:null};
+    const live0 = cached ? Object.assign(climweb0, {nowcastLoc:{label:'São Paulo, São Paulo, Brasil', lat:-23.55, lng:-46.63}}, cached, {loaded:true, fromCache:true})
+      : Object.assign({ loaded:false, regions:null, alerts:null, nowcast:null, indices:null, trends:null, windGrid:null, source:'—', nowcastLoc:{label:'São Paulo, São Paulo, Brasil', lat:-23.55, lng:-46.63} }, climweb0);
+    this.state = { lang:'pt', sev:'all', timelineHour:0,
+      playing:true, frame:0, windDensity:'media', liveStamp:'', spin:true,
+      period:'6h/10min', resolution:'4 km', opacity:100,
+      live: live0,
+      // wind starts off: its Open-Meteo grid (~209 points) is the most expensive call —
+      // it is fetched on demand when the user turns the layer on (cached for 30 min).
+      activeLayers:{ satellite:true, clouds:true, borders:true, wind:false, temp:false, rain:true, alerts:true, stations:true },
+      climwebGroup:'all', climwebState:'all', selectedClimwebKey:null,
+      climwebActionLoading:false, climwebActionResult:null };
+  }
+
+  // DSAT animation period/frequency presets -> {spanHours, stepMin}
+  PERIODS = {
+    '3h/10min':{span:3, step:10}, '6h/10min':{span:6, step:10}, '6h/20min':{span:6, step:20},
+    '9h/30min':{span:9, step:30}, '24h/1h':{span:24, step:60}, '36h/3h':{span:36, step:180}, '72h/3h':{span:72, step:180}
+  };
+  RESOLUTIONS = ['16 km','8 km','4 km','2 km','1 km','500 m'];
+  periodMeta(){ return this.PERIODS[this.state.period]||this.PERIODS['6h/10min']; }
+  periodFrames(){ const m=this.periodMeta(); return Math.round(m.span*60/m.step); }
+  FRAMES=8;   // number of real daily NASA frames the time-player animates through
+
+  /* ---------------- static data ---------------- */
+  // Toggleable layers stacked over the real-imagery 3D globe
+  LAYERS = [
+    {id:'satellite', pt:'Satélite',       en:'Satellite',    swatch:'#5b8fd6', kind:'base'},
+    {id:'clouds',    pt:'Nuvens',         en:'Clouds',       swatch:'#e6edf3', kind:'base'},
+    {id:'borders',   pt:'Fronteiras',     en:'Borders',      swatch:'#22d3ee', kind:'base'},
+    {id:'wind',      pt:'Vento',          en:'Wind',         swatch:'#5eead4', kind:'base'},
+    {id:'temp',      pt:'Temperatura',    en:'Temperature',  swatch:'#f97316', unit:'°C (MODIS LST)', lo:'-25', hi:'45', interp:'temp', kind:'data'},
+    {id:'rain',      pt:'Precipitação',   en:'Precipitation',swatch:'#38bdf8', unit:'mm/h (GPM)', lo:'0',  hi:'30', interp:'rain', kind:'data'},
+    {id:'alerts',    pt:'Alertas',        en:'Alerts',       swatch:'#dc2626', kind:'base'},
+    {id:'stations',  pt:'Estações',       en:'Stations',     swatch:'#67e8f9', kind:'base'}
+  ];
+
+  // wind vector density presets (like DSAT)
+  WIND_DENSITY = { baixa:900, media:2200, alta:4200, muito:7000 };
+
+  ALERTS = [
+    {id:1, lng:34.8, lat:-19.8, sev:'extreme', type:'cyclone', icon:'🌀', region:'Moçambique', regionEn:'Mozambique', area:'Sofala', mins:18, pt:'Ciclone tropical Idai-3 a 120 km de Beira', en:'Tropical cyclone Idai-3 120 km from Beira'},
+    {id:2, lng:90.4, lat:23.8, sev:'extreme', type:'flood', icon:'🌊', region:'Bangladesh', regionEn:'Bangladesh', area:'Dhaka', mins:42, pt:'Inundação repentina — rio Buriganga acima da cota', en:'Flash flooding — Buriganga river above threshold'},
+    {id:3, lng:-51.2, lat:-30.0, sev:'severe', type:'flood', icon:'🌧️', region:'Brasil', regionEn:'Brazil', area:'Rio Grande do Sul', mins:65, pt:'Chuva extrema no Guaíba, risco de transbordamento', en:'Extreme rainfall on Guaíba, overflow risk'},
+    {id:4, lng:77.2, lat:28.6, sev:'severe', type:'heat', icon:'🔥', region:'Índia', regionEn:'India', area:'Delhi NCR', mins:90, pt:'Onda de calor — máximas de 47 °C por 4 dias', en:'Heatwave — highs of 47 °C for 4 days'},
+    {id:5, lng:121.0, lat:14.6, sev:'severe', type:'typhoon', icon:'🌪️', region:'Filipinas', regionEn:'Philippines', area:'Luzon', mins:110, pt:'Tufão categoria 3 com ventos de 185 km/h', en:'Category 3 typhoon, winds of 185 km/h'},
+    {id:6, lng:-90.07, lat:29.95, sev:'severe', type:'storm', icon:'⛈️', region:'EUA', regionEn:'USA', area:'Louisiana', mins:140, pt:'Tempestade severa com granizo e tornados', en:'Severe storm with hail and tornadoes'},
+    {id:7, lng:36.8, lat:-1.3, sev:'moderate', type:'drought', icon:'🏜️', region:'Quênia', regionEn:'Kenya', area:'Turkana', mins:200, pt:'Seca prolongada — 4ª estação sem chuva', en:'Prolonged drought — 4th failed rainy season'},
+    {id:8, lng:-3.7, lat:40.4, sev:'moderate', type:'heat', icon:'🌡️', region:'Espanha', regionEn:'Spain', area:'Madrid', mins:240, pt:'Aviso de calor — máximas próximas de 41 °C', en:'Heat advisory — highs near 41 °C'},
+    {id:9, lng:151.2, lat:-33.9, sev:'moderate', type:'fire', icon:'🔥', region:'Austrália', regionEn:'Australia', area:'New South Wales', mins:300, pt:'Risco elevado de incêndio florestal', en:'Elevated bushfire danger'},
+    {id:10, lng:-73.6, lat:45.5, sev:'minor', type:'snow', icon:'❄️', region:'Canadá', regionEn:'Canada', area:'Quebec', mins:380, pt:'Nevasca leve, 10–15 cm previstos', en:'Light snowfall, 10–15 cm expected'},
+    {id:11, lng:-0.12, lat:51.5, sev:'minor', type:'wind', icon:'💨', region:'Reino Unido', regionEn:'United Kingdom', area:'London', mins:420, pt:'Ventos fortes — rajadas de até 70 km/h', en:'Strong winds — gusts up to 70 km/h'},
+    {id:12, lng:-70.66, lat:-33.45, sev:'minor', type:'drought', icon:'🏜️', region:'Chile', regionEn:'Chile', area:'Santiago', mins:500, pt:'Déficit hídrico moderado na zona central', en:'Moderate water deficit in central zone'}
+  ];
+
+  REGIONS = [
+    {city:'São Paulo', lat:-23.55, lng:-46.63, zonePt:'América do Sul', zoneEn:'South America', icon:'⛅', temp:24, hi:27, lo:18, condPt:'Parcial', condEn:'Partly', trend:'+1.2°'},
+    {city:'Lagos', lat:6.45, lng:3.39, zonePt:'África Ocidental', zoneEn:'West Africa', icon:'🌦️', temp:31, hi:33, lo:26, condPt:'Úmido', condEn:'Humid', trend:'+0.4°'},
+    {city:'Nairóbi', lat:-1.29, lng:36.82, zonePt:'África Oriental', zoneEn:'East Africa', icon:'🌤️', temp:22, hi:26, lo:14, condPt:'Limpo', condEn:'Clear', trend:'−0.3°'},
+    {city:'Nova Délhi', lat:28.61, lng:77.21, zonePt:'Sul da Ásia', zoneEn:'South Asia', icon:'🔥', temp:43, hi:47, lo:31, condPt:'Calor', condEn:'Hot', trend:'+3.1°'},
+    {city:'Londres', lat:51.51, lng:-0.13, zonePt:'Europa', zoneEn:'Europe', icon:'🌧️', temp:13, hi:16, lo:9, condPt:'Chuva', condEn:'Rain', trend:'−0.8°'},
+    {city:'Tóquio', lat:35.68, lng:139.69, zonePt:'Ásia Oriental', zoneEn:'East Asia', icon:'☁️', temp:19, hi:22, lo:15, condPt:'Nublado', condEn:'Cloudy', trend:'+0.2°'},
+    {city:'Sydney', lat:-33.87, lng:151.21, zonePt:'Oceania', zoneEn:'Oceania', icon:'☀️', temp:26, hi:29, lo:19, condPt:'Sol', condEn:'Sunny', trend:'+1.7°'},
+    {city:'Reykjavík', lat:64.13, lng:-21.9, zonePt:'Ártico', zoneEn:'Arctic', icon:'❄️', temp:4, hi:6, lo:-1, condPt:'Gélido', condEn:'Frosty', trend:'+0.9°'}
+  ];
+
+  // WMO weather code -> {icon, pt, en}
+  WMO = {
+    0:['☀️','Céu limpo','Clear'],1:['🌤️','Predom. limpo','Mainly clear'],2:['⛅','Parc. nublado','Partly cloudy'],3:['☁️','Nublado','Overcast'],
+    45:['🌫️','Névoa','Fog'],48:['🌫️','Névoa gelada','Rime fog'],
+    51:['🌦️','Garoa leve','Light drizzle'],53:['🌦️','Garoa','Drizzle'],55:['🌦️','Garoa densa','Dense drizzle'],
+    61:['🌧️','Chuva leve','Light rain'],63:['🌧️','Chuva','Rain'],65:['🌧️','Chuva forte','Heavy rain'],
+    66:['🌧️','Chuva gelada','Freezing rain'],67:['🌧️','Chuva gelada','Freezing rain'],
+    71:['🌨️','Neve leve','Light snow'],73:['🌨️','Neve','Snow'],75:['❄️','Neve forte','Heavy snow'],77:['🌨️','Granizo fino','Snow grains'],
+    80:['🌦️','Pancadas','Showers'],81:['🌦️','Pancadas','Showers'],82:['⛈️','Pancadas fortes','Violent showers'],
+    85:['🌨️','Pancadas de neve','Snow showers'],86:['🌨️','Pancadas de neve','Snow showers'],
+    95:['⛈️','Tempestade','Thunderstorm'],96:['⛈️','Tempestade c/ granizo','Storm w/ hail'],99:['⛈️','Tempestade severa','Severe storm']
+  };
+  wmo(code){ return this.WMO[code]||['🌡️','—','—']; }
+
+  T = {
+    pt:{
+      brandSub:'Observatório climático global', heroKicker:'Monitoramento em tempo real · 24/7',
+      heroTitle:'Vigilância climática de todas as regiões do planeta',
+      heroSub:'Alertas, previsões e camadas de satélite num só painel — para cientistas, gestores de risco e o público de todas as latitudes.',
+      liveAlert:'Alerta ao vivo', layersTitle:'Produtos & camadas · GOES-Leste',
+      alertsTitle:'Alertas CAP ativos', nowcastTitle:'Previsão imediata', nowcastSub:'Próximas 12 horas',
+      rainProb:'Chuva', wind:'Vento', forecastFor:'Previsão', now:'Agora', searchPlaceholder:'Buscar cidade, estado ou país…', dateTitle:'Data específica:', dateLoading:'Consultando…', dateNoData:'Sem dados para esta data',
+      dateRateLimit:'Fonte Open-Meteo temporariamente limitada. Tente novamente em alguns minutos.',
+      dateSourceError:'Nao foi possivel consultar a fonte real agora.',
+      dateOutOfRange:'Data fora do horizonte disponivel da fonte.',
+      nowcastRateLimit:'Open-Meteo temporariamente limitado',
+      nowcastError:'Fonte real indisponivel agora',
+      satTitle:'Satélite & camada ativa', trendsTitle:'Tendências', last14:'Últimos 14 dias',
+      tempTrend:'Temperatura', precipTrend:'Precipitação',
+      globeTruth:'Camadas reais no globo',
+      satFrame:'Ultimo frame', satLatency:'Latencia', satLatencyValue:'NASA GIBS ~48h',
+      satStatusOfficial:'Raster oficial ClimWeb ativo', satStatusGibs:'NASA GIBS: ultimo frame publicado',
+      trendSource:'Open-Meteo observado', trendPending:'Aguardando serie real',
+      trendLegendNote:'Serie diaria real: maxima em C e precipitacao em mm.',
+      regionsTitle:'Temperatura por região', regionsSub:'estações de superfície sincronizadas',
+      uvTitle:'Índice UV', aqiTitle:'Qualidade do ar', windTitle:'Vento de superfície', gust:'Rajada',
+      pressTitle:'Pressão atmosférica', pressNote:'Tendência barométrica em alta — tempo estável.',
+      sciTag:'Operacao ClimWeb', sciTitle:'Funcoes oficiais em uso no painel',
+      sciSub:'Cada ferramenta do repositorio aparece como camada, painel, fluxo publico, endpoint testavel ou configuracao operacional.',
+      windDensity:'Densidade do vento', windScale:'velocidade', cadence:'Cadência', frameCount:'24 quadros · 4h',
+      start:'Início', current:'Atual', end:'Fim', periodFreq:'Período e Frequência', resolution:'Resolução', opacity:'Opacidade',
+      download:'Baixar dataset', apiDocs:'Documentação da API', datasets:'Conjuntos de dados',
+      climwebTag:'Nosso portal', climwebTitle:'Serviços e informações para você', climwebSub:'Previsões, avisos, mapas, dados de observação, publicações e canais de atendimento — tudo em um só lugar, atualizado automaticamente ao longo do dia.',
+      portalNowTitle:'Em destaque agora', portalExploreTitle:'Explore o portal', portalSupportTitle:'Atendimento e participação', soonLabel:'em breve',
+      truthTitle:'Data Truth', source:'Fonte', state:'Estado', latest:'Última atualização', count:'Contagem', endpoint:'Endpoint', open:'Abrir', use:'Usar', noData:'Sem dado pronto', pending:'Pendente de importação',
+      refresh:'Atualizar fontes', modulesVisible:'Modulos visiveis', availableFunctions:'Funcoes e detalhes', endpoints:'Endpoints', livePreview:'Fonte real', loadingSource:'Consultando fonte real...', pickFunction:'Use um card acima para aplicar a funcao no dashboard ou testar uma fonte real em tempo real.',
+      layerStack:'Camadas operacionais', featuresInUse:'Funcoes ligadas ao globo', sourceResult:'Resultado da ultima acao', cmsChannels:'Conteudo publico CMS', publicFlows:'Fluxos publicos', platformOps:'Operacao e APIs', apply:'Aplicar', test:'Testar', configure:'Configurar', openPage:'Abrir pagina', openPanel:'Abrir painel', autoRefresh:'Auto-refresh',
+      footerNote:'Serviço de informações meteorológicas e climáticas. Previsões, avisos e mapas são atualizados continuamente a partir de fontes oficiais nacionais e internacionais — entre elas a Organização Meteorológica Mundial, a NASA e redes públicas de observação.'
+    },
+    en:{
+      brandSub:'Global climate observatory', heroKicker:'Real-time monitoring · 24/7',
+      heroTitle:'Climate watch across every region of the planet',
+      heroSub:'Alerts, forecasts and satellite layers in a single panel — for scientists, risk managers and the public at every latitude.',
+      liveAlert:'Live alert', layersTitle:'Products & layers · GOES-East',
+      alertsTitle:'Active CAP alerts', nowcastTitle:'Nowcast', nowcastSub:'Next 12 hours',
+      rainProb:'Rain', wind:'Wind', forecastFor:'Forecast', now:'Now', searchPlaceholder:'Search city, state or country…', dateTitle:'Specific date:', dateLoading:'Loading…', dateNoData:'No data for this date',
+      dateRateLimit:'Open-Meteo source is temporarily rate-limited. Try again in a few minutes.',
+      dateSourceError:'Could not query the real source right now.',
+      dateOutOfRange:'Date is outside the available source horizon.',
+      nowcastRateLimit:'Open-Meteo temporarily rate-limited',
+      nowcastError:'Real source unavailable right now',
+      satTitle:'Satellite & active layer', trendsTitle:'Trends', last14:'Last 14 days',
+      tempTrend:'Temperature', precipTrend:'Precipitation',
+      globeTruth:'Real layers on globe',
+      satFrame:'Latest frame', satLatency:'Latency', satLatencyValue:'NASA GIBS ~48h',
+      satStatusOfficial:'Official ClimWeb raster active', satStatusGibs:'NASA GIBS: latest published frame',
+      trendSource:'Open-Meteo observed', trendPending:'Waiting for real series',
+      trendLegendNote:'Real daily series: max C and precipitation mm.',
+      regionsTitle:'Temperature by region', regionsSub:'synced surface stations',
+      uvTitle:'UV index', aqiTitle:'Air quality', windTitle:'Surface wind', gust:'Gust',
+      pressTitle:'Atmospheric pressure', pressNote:'Barometric trend rising — stable conditions.',
+      sciTag:'ClimWeb operation', sciTitle:'Official functions used in the panel',
+      sciSub:'Every repository tool appears as a layer, panel, public flow, testable endpoint, or operational configuration.',
+      windDensity:'Wind density', windScale:'speed', cadence:'Cadence', frameCount:'24 frames · 4h',
+      start:'Start', current:'Current', end:'End', periodFreq:'Period & Frequency', resolution:'Resolution', opacity:'Opacity',
+      download:'Download dataset', apiDocs:'API documentation', datasets:'Datasets',
+      climwebTag:'Our portal', climwebTitle:'Services and information for you', climwebSub:'Forecasts, warnings, maps, observation data, publications and support channels — all in one place, refreshed automatically throughout the day.',
+      portalNowTitle:'Highlights right now', portalExploreTitle:'Explore the portal', portalSupportTitle:'Support and participation', soonLabel:'coming soon',
+      truthTitle:'Data Truth', source:'Source', state:'State', latest:'Latest update', count:'Count', endpoint:'Endpoint', open:'Open', use:'Use', noData:'No ready data', pending:'Pending import',
+      refresh:'Refresh sources', modulesVisible:'Visible modules', availableFunctions:'Functions and details', endpoints:'Endpoints', livePreview:'Real source', loadingSource:'Querying real source...', pickFunction:'Use a card above to apply the function to the dashboard or test a real source in real time.',
+      layerStack:'Operational layers', featuresInUse:'Functions connected to the globe', sourceResult:'Last action result', cmsChannels:'Public CMS content', publicFlows:'Public flows', platformOps:'Operations and APIs', apply:'Apply', test:'Test', configure:'Configure', openPage:'Open page', openPanel:'Open panel', autoRefresh:'Auto-refresh',
+      footerNote:'Weather and climate information service. Forecasts, warnings and maps are continuously updated from official national and international sources — including the World Meteorological Organization, NASA and public observation networks.'
+    }
+  };
+
+  /* ---------------- helpers ---------------- */
+  sevMeta(s){
+    const m={extreme:{c:'#dc2626',t:'#fde8e8',pt:'Extremo',en:'Extreme'},severe:{c:'#f97316',t:'#feeede',pt:'Severo',en:'Severe'},moderate:{c:'#f59e0b',t:'#fef3da',pt:'Moderado',en:'Moderate'},minor:{c:'#16a34a',t:'#e3f6e9',pt:'Menor',en:'Minor'}};
+    return m[s];
+  }
+  fmtAgo(mins,lang){
+    if(mins<60) return (lang==='pt'?'há ':'')+mins+'min'+(lang==='en'?' ago':'');
+    const h=Math.floor(mins/60);
+    return (lang==='pt'?'há ':'')+h+'h'+(lang==='en'?' ago':'');
+  }
+  noise(lng,lat,seed){
+    const a=Math.sin((lat+seed*7)*0.0451+seed)*Math.cos((lng-seed*5)*0.031);
+    const b=Math.sin((lng+lat*0.6+seed*3)*0.027)*0.7;
+    const c=Math.cos((lat*0.9-lng*0.4+seed*11)*0.019)*0.5;
+    return Math.max(0,Math.min(1,0.5+0.42*(a*0.6+b*0.3+c*0.4)));
+  }
+  layerInterp(id){
+    const d=window.d3; if(!d) return ()=>'#888';
+    switch(id){
+      case 'temp': return t=>d.interpolateRdYlBu(1-t);
+      case 'rain': return t=>d.interpolateBuPu(0.12+t*0.85);
+      case 'clouds': return t=>`rgba(255,255,255,${0.15+t*0.7})`;
+      case 'ir': return t=>d.interpolateSpectral(t);
+      case 'vapor': return t=>d.interpolateGnBu(0.15+t*0.8);
+      case 'wind': return t=>d.interpolateCool(0.1+t*0.85);
+      case 'pressure': return t=>d.interpolatePuOr(t);
+      case 'uv': return t=>d.interpolateYlOrRd(0.1+t*0.85);
+      case 'aqi': return t=>d.interpolateRdYlGn(1-t);
+      default: return ()=>'#888';
+    }
+  }
+
+  /* ---------------- globe engine ---------------- */
+  componentDidMount(){
+    this.tick = setInterval(()=>{ if(this.clockRef.current){ this.clockRef.current.textContent = new Date().toISOString().slice(11,19)+' UTC'; } },1000);
+    this._wait = setInterval(()=>{
+      if(window.d3 && window.topojson && window.THREE){ clearInterval(this._wait); this.initGlobe(); this.initSat(); }
+    },120);
+    this.fetchRealData();
+    setTimeout(()=>{ this.drawTrendCanvas(); this.drawPressureCanvas(); },0);
+    // refresh live data every 10 minutes (DSAT cadence)
+    this._refresh = setInterval(()=>this.fetchRealData(), 600000);
+  }
+
+  // ---- REAL DATA: each source fetched INDEPENDENTLY in parallel, with a timeout, so one
+  //      slow/hanging endpoint never blocks the others. Each merges into state as it returns. ----
+
+  // Backend base URL — lets this front-end run on GitHub Pages while talking to a
+  // ClimWeb server. Priority: ?api=<url> → window.CLIMASPHERE_API_BASE → default
+  // http://localhost:8000 when served from *.github.io → '' (same origin).
+  apiBase(){
+    if(this._apiBase!==undefined) return this._apiBase;
+    let b='';
+    try{
+      b=new URLSearchParams(window.location.search).get('api')||window.CLIMASPHERE_API_BASE||'';
+      if(!b && /\.github\.io$/i.test(window.location.hostname)) b='http://localhost:8000';
+    }catch(e){}
+    this._apiBase=String(b||'').replace(/\/+$/,'');
+    return this._apiBase;
+  }
+  apiUrl(path){ return (path && typeof path==='string' && path.charAt(0)==='/') ? this.apiBase()+path : path; }
+
+  fetchJson(url, ms){
+    url=this.apiUrl(url);
+    ms=ms||12000;
+    const ctl=('AbortController' in window)?new AbortController():null;
+    const to=setTimeout(()=>{ try{ ctl&&ctl.abort(); }catch(e){} }, ms);
+    return fetch(url, ctl?{signal:ctl.signal}:undefined).then(r=>{ if(!r.ok) throw new Error(r.status+' '+r.statusText); return r.json(); }).finally(()=>clearTimeout(to));
+  }
+  patchLive(patch, cb){ this.setState(prev=>({ live: Object.assign({}, prev.live, patch) }), ()=>{ this.cacheLive(); cb&&cb(); }); }
+  cacheLive(){ try{ const l=this.state.live; localStorage.setItem('climasphere_live_v1', JSON.stringify({ regions:l.regions, regionsUpdated:l.regionsUpdated, externalAlerts:l.externalAlerts, alerts:l.alerts, nowcast:l.nowcast, indices:l.indices, trends:l.trends, windGrid:l.windGrid, windUpdated:l.windUpdated, climwebOverview:l.climwebOverview, climwebStatus:l.climwebStatus, climwebForecast:l.climwebForecast, climwebRasters:l.climwebRasters, climwebBoundaries:l.climwebBoundaries, climwebStations:l.climwebStations, climwebCap:l.climwebCap, climwebUpdated:l.climwebUpdated, source:l.source, savedAt:Date.now() })); }catch(e){} }
+
+  async fetchRealData(){
+    // fire everything in parallel — resilient, non-blocking.
+    // Open-Meteo budget: GPS/current-location nowcast only; regions once per session;
+    // wind grid only while the wind layer is on. Searches and dates fetch on demand.
+    const first=!this._bootstrapped; this._bootstrapped=true;
+    this.fetchClimweb();
+    this.fetchAlerts();
+    this.loadGibs();
+    if(first){
+      // regions: reuse the cached panel if it is under 1 hour old (survives reloads)
+      const l=this.state.live||{};
+      if(!(l.regions && l.regionsUpdated && (Date.now()-l.regionsUpdated)<3600000)) this.fetchRegions();
+      this.locateAndFetchNowcast();   // GPS-first (1 call); falls back to default city
+    } else {
+      this.fetchNowcast();            // refresh only the currently selected location
+    }
+    if(this.state.activeLayers && this.state.activeLayers.wind) this.maybeFetchWindGrid();
+    this.patchLive({ loaded:true, source:'ClimWeb/WMO · Open-Meteo · GDACS · USGS · NASA GIBS', updated:new Date() });
+  }
+
+  // GPS-first nowcast: ask the browser for the user's position once; on success fetch
+  // the forecast for that exact spot, otherwise fall back to the default city.
+  locateAndFetchNowcast(){
+    let done=false;
+    const fallback=()=>{ if(!done){ done=true; this.fetchNowcast(); } };
+    if(!('geolocation' in navigator)){ fallback(); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos=>{
+        if(done) return; done=true;
+        const L=this.state.lang;
+        const loc={ label:(L==='pt'?'Minha localização':'My location'), lat:+pos.coords.latitude.toFixed(3), lng:+pos.coords.longitude.toFixed(3), gps:true };
+        this.patchLive({ nowcastLoc:loc, nowcast:null, indices:null }, ()=>this.fetchNowcast(loc));
+        if(this.flyTo) this.flyTo(loc.lng, loc.lat);
+      },
+      ()=>fallback(),
+      { enableHighAccuracy:false, timeout:8000, maximumAge:600000 }
+    );
+    setTimeout(fallback, 9000); // belt-and-braces: never leave the panel empty
+  }
+
+  // wind grid is the heaviest Open-Meteo request (~209 grid points) — fetch it only
+  // when the wind layer is actually visible, and at most every 30 minutes.
+  maybeFetchWindGrid(){
+    const l=this.state.live||{};
+    if(l.windGrid && l.windUpdated && (Date.now()-l.windUpdated)<1800000) return;
+    this.fetchWindGrid();
+  }
+
+  async fetchClimweb(){
+    const endpoints=[
+      ['climwebOverview','/api/climasphere/overview',12000],
+      ['climwebStatus','/api/climasphere/status',10000],
+      ['climwebForecast','/api/climasphere/forecast?limit=300',12000],
+      ['climwebRasters','/api/climasphere/rasters',12000],
+      ['climwebBoundaries','/api/climasphere/boundaries.geojson?level=1',12000],
+      ['climwebStations','/api/stations?limit=800&status=active&kind=land',12000],
+      ['climwebCap','/api/cap/alerts.geojson',10000]
+    ];
+    const patch={climwebErrors:{}, climwebUpdated:new Date().toISOString()};
+    const results=await Promise.all(endpoints.map(([key,url,ms])=>this.fetchJson(url,ms).then(value=>({key,value})).catch(error=>({key,error:(error&&error.message)||String(error)}))));
+    results.forEach(r=>{ if(r.error) patch.climwebErrors[r.key]=r.error; else patch[r.key]=r.value; });
+    // GitHub Pages sem backend acessível: usa o snapshot real de estações do repositório
+    // (data/stations.json, atualizado por GitHub Actions) para a rede de observação.
+    if(patch.climwebErrors.climwebStations && !(this.state.live&&this.state.live.climwebStations)){
+      try{ patch.climwebStations=await this.fetchJson('./data/stations.json', 10000); delete patch.climwebErrors.climwebStations; }catch(e){}
+    }
+    this.patchLive(patch, ()=>{
+      this.refreshAlertMarkers();
+      this.refreshStationMarkers();
+      if(patch.climwebBoundaries) this.drawBoundaryTexture(patch.climwebBoundaries);
+      if(patch.climwebRasters) this.loadClimwebRasterFrames(patch.climwebRasters);
+    });
+  }
+
+  moduleByKey(key){
+    const mods=(this.state.live&&this.state.live.climwebOverview&&this.state.live.climwebOverview.modules)||[];
+    return mods.find(m=>m.key===key)||null;
+  }
+  fmtDateShort(value){
+    if(!value) return '—';
+    const d=new Date(value); if(Number.isNaN(d.getTime())) return String(value);
+    return d.toISOString().slice(0,16).replace('T',' ');
+  }
+  firstEndpoint(module){
+    const eps=(module&&module.endpoints)||{};
+    for(const k in eps){ const v=eps[k]; if(v && String(v).indexOf('<')<0 && String(v).indexOf('{')<0) return v; }
+    return module&&module.admin_url ? module.admin_url : '#';
+  }
+  endpointByKind(module, kinds){
+    const eps=(module&&module.endpoints)||{};
+    for(const kind of kinds){
+      const v=eps[kind];
+      if(v && String(v).indexOf('<')<0 && String(v).indexOf('{')<0) return v;
+    }
+    return null;
+  }
+  previewEndpoint(module){
+    if(!module) return null;
+    const url=this.endpointByKind(module, ['forecast','climasphere_rasters','geojson','json','info','cityclimate','images','time_values','health','overview','wagtail_api','rss','reports']);
+    if(url) return url;
+    const first=this.firstEndpoint(module);
+    return first && (first.indexOf('/api/')===0 || first.indexOf('.xml')>0 || first.indexOf('/wdqms-reports/')===0) ? first : null;
+  }
+  publicEndpoint(module){
+    if(!module) return null;
+    return this.endpointByKind(module, ['page','native','mapviewer','reports']) || null;
+  }
+  openUrl(url){
+    if(!url||url==='#') return;
+    window.open(this.apiUrl(url), '_blank', 'noopener');
+  }
+  selectClimwebModule(key){
+    this.setState({selectedClimwebKey:key, climwebActionResult:null});
+  }
+  moduleUseCase(module){
+    const L=this.state.lang, key=(module&&module.key)||'', group=(module&&module.group)||'';
+    if(key.indexOf('forecastmanager')>=0) return L==='pt'?'Alimenta a previsao imediata, a busca de cidades e as estatisticas oficiais do hero.':'Powers nowcast, city search, and official hero statistics.';
+    if(key.indexOf('weather.')>=0) return L==='pt'?'Abre a pagina publica de previsao operacional do Wagtail.':'Opens the public operational weather page in Wagtail.';
+    if(key.indexOf('cityclimate')>=0) return L==='pt'?'Disponibiliza pagina para series e parametros climaticos por cidade.':'Provides the city climate data page for parameters and series.';
+    if(key.indexOf('geomanager')>=0) return L==='pt'?'Ativa camadas raster oficiais no player temporal e aponta para o MapViewer.':'Activates official raster layers in the time player and links to MapViewer.';
+    if(key.indexOf('adminboundary')>=0) return L==='pt'?'Liga as fronteiras oficiais no globo e expõe GeoJSON/MVT.':'Turns official boundaries on in the globe and exposes GeoJSON/MVT.';
+    if(key.indexOf('satellite_imagery')>=0) return L==='pt'?'Usa o pipeline de imagens/raster para animacao temporal.':'Uses the imagery/raster pipeline for temporal animation.';
+    if(key.indexOf('cap.alerts')>=0) return L==='pt'?'Liga alertas oficiais CAP no painel e abre feeds GeoJSON/RSS/XML.':'Enables official CAP alerts in the panel and opens GeoJSON/RSS/XML feeds.';
+    if(key.indexOf('stations')>=0) return L==='pt'?'Mostra estacoes OSCAR/WMO no globo e fornece JSON/MVT.':'Shows OSCAR/WMO stations on the globe and provides JSON/MVT.';
+    if(key.indexOf('wdqms')>=0) return L==='pt'?'Abre monitoramento de qualidade WDQMS e mostra transmissoes/variaveis.':'Opens WDQMS quality monitoring and exposes transmissions/variables.';
+    if(group==='cms') return L==='pt'?'Abre a area publica/editorial correspondente e mantém fonte CMS rastreavel.':'Opens the corresponding public/editorial area with traceable CMS source.';
+    if(group==='public_interaction') return L==='pt'?'Abre o fluxo publico de formulario, assinatura ou configuracao externa.':'Opens the public form, subscription, or external configuration flow.';
+    if(group==='platform') return L==='pt'?'Abre endpoints de saude, midia, documentos e operacao da plataforma.':'Opens health, media, document, and platform operation endpoints.';
+    return L==='pt'?'Modulo exposto pelo inventario operacional ClimWeb.':'Module exposed by the ClimWeb operational inventory.';
+  }
+  applyClimwebModule(module){
+    if(!module) return;
+    const key=module.key||'', L=this.state.lang;
+    const scroll=(id)=>{ const el=document.getElementById(id); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); };
+    const activate=(patch)=>this.setState(prev=>({activeLayers:Object.assign({}, prev.activeLayers, patch)}), ()=>{ this.applyLayers&&this.applyLayers(); });
+    if(key.indexOf('forecastmanager')>=0 || key.indexOf('weather.')>=0 || key.indexOf('cityclimate')>=0){
+      scroll('previsao');
+      this.setState({climwebActionResult:{ok:true,title:module.label,headline:L==='pt'?'Funcao aplicada: painel de previsao em foco.':'Function applied: forecast panel focused.',rows:[{label:L==='pt'?'Fonte':'Source',value:module.source},{label:L==='pt'?'Contagem':'Count',value:module.count}]}});
+      return;
+    }
+    if(key.indexOf('geomanager')>=0){
+      activate({rain:true,satellite:true});
+      scroll('globo');
+      this.setState({climwebActionResult:{ok:true,title:module.label,headline:L==='pt'?'Raster oficial aplicado ao player temporal.':'Official raster applied to the time player.',rows:[{label:'Endpoint',value:'/api/climasphere/rasters'},{label:L==='pt'?'Arquivos':'Files',value:(module.items&&module.items[1]&&module.items[1].value)||module.count}]}});
+      return;
+    }
+    if(key.indexOf('adminboundary')>=0){
+      activate({borders:true});
+      scroll('globo');
+      this.setState({climwebActionResult:{ok:true,title:module.label,headline:L==='pt'?'Fronteiras oficiais ligadas no globo.':'Official boundaries turned on in the globe.',rows:[{label:'GeoJSON',value:'/api/climasphere/boundaries.geojson'},{label:'MVT',value:'/api/admin-boundary/tiles/{z}/{x}/{y}'}]}});
+      return;
+    }
+    if(key.indexOf('satellite_imagery')>=0){
+      activate({satellite:true,clouds:true});
+      scroll('globo');
+      this.setState({climwebActionResult:{ok:true,title:module.label,headline:L==='pt'?'Imagem de satelite e animacao temporal em foco.':'Satellite imagery and temporal animation focused.',rows:[{label:'API',value:'/api/satellite-imagery/time_value/'},{label:L==='pt'?'Fallback':'Fallback',value:'GeoManager rasters'}]}});
+      return;
+    }
+    if(key.indexOf('cap.alerts')>=0){
+      activate({alerts:true});
+      scroll('alertas');
+      this.setState({climwebActionResult:{ok:true,title:module.label,headline:L==='pt'?'Camada de alertas ligada; lista de alertas em foco.':'Alert layer enabled; alert list focused.',rows:[{label:'GeoJSON',value:'/api/cap/alerts.geojson'},{label:'RSS',value:'/api/cap/rss.xml'}]}});
+      return;
+    }
+    if(key.indexOf('stations')>=0){
+      activate({stations:true});
+      scroll('globo');
+      this.setState({climwebActionResult:{ok:true,title:module.label,headline:L==='pt'?'Estacoes OSCAR/WMO ligadas no globo.':'OSCAR/WMO stations enabled on the globe.',rows:[{label:'JSON',value:'/api/stations'},{label:'MVT',value:'/api/station-tiles/{z}/{x}/{y}'}]}});
+      return;
+    }
+    const url=this.publicEndpoint(module)||this.firstEndpoint(module);
+    if(url&&url!=='#') this.openUrl(url);
+    this.setState({climwebActionResult:{ok:true,title:module.label,headline:L==='pt'?'Funcao aberta em nova aba.':'Function opened in a new tab.',rows:[{label:'URL',value:url||'—'}]}});
+  }
+  summarizePayload(payload, text){
+    const L=this.state.lang;
+    const rows=[];
+    if(payload&&payload.type==='FeatureCollection'){
+      const n=(payload.features||[]).length;
+      (payload.features||[]).slice(0,4).forEach((f,i)=>{ const p=f.properties||{}; rows.push({label:p.headline||p.event||p.name||('feature '+(i+1)), value:p.severity||p.country||p.areaDesc||'GeoJSON'}); });
+      return {headline:(L==='pt'?`${n} feicoes GeoJSON retornadas.`:`${n} GeoJSON features returned.`), rows};
+    }
+    if(Array.isArray(payload)){
+      payload.slice(0,4).forEach((v,i)=>rows.push({label:'#'+(i+1), value:typeof v==='object'?Object.keys(v).slice(0,4).join(', '):String(v)}));
+      return {headline:(L==='pt'?`${payload.length} registros retornados.`:`${payload.length} records returned.`), rows};
+    }
+    if(payload&&typeof payload==='object'){
+      if(Array.isArray(payload.modules)){ rows.push({label:'ready', value:(payload.states&&payload.states.ready)||0}); rows.push({label:'unconfigured', value:(payload.states&&payload.states.unconfigured)||0}); return {headline:L==='pt'?'Overview operacional carregado.':'Operational overview loaded.', rows}; }
+      if(Array.isArray(payload.cities)){ payload.cities.slice(0,4).forEach(c=>rows.push({label:c.name||c.city||'city', value:[c.lat,c.lon].filter(x=>x!=null).join(', ')})); return {headline:(L==='pt'?`${payload.cities.length} cidades carregadas.`:`${payload.cities.length} cities loaded.`), rows}; }
+      if(Array.isArray(payload.stations)){ payload.stations.slice(0,4).forEach(s=>rows.push({label:s.name||s.station_name||s.wigos_id||'station', value:s.country||s.status||s.kind||'OSCAR/WMO'})); return {headline:(L==='pt'?`${payload.stations.length} estacoes na amostra carregada.`:`${payload.stations.length} stations loaded in sample.`), rows}; }
+      if(Array.isArray(payload.features)){ payload.features.slice(0,4).forEach((f,i)=>rows.push({label:(f.properties&&f.properties.name)||('feature '+(i+1)), value:(f.geometry&&f.geometry.type)||'feature'})); return {headline:(L==='pt'?`${payload.features.length} feicoes retornadas.`:`${payload.features.length} features returned.`), rows}; }
+      Object.keys(payload).slice(0,5).forEach(k=>{ const v=payload[k]; rows.push({label:k, value:Array.isArray(v)?`${v.length} items`:((v&&typeof v==='object')?Object.keys(v).slice(0,3).join(', '):String(v))}); });
+      return {headline:L==='pt'?'Resposta JSON carregada da fonte real.':'JSON response loaded from the real source.', rows};
+    }
+    const clean=String(text||'').replace(/\s+/g,' ').slice(0,220);
+    return {headline:L==='pt'?'Resposta de texto carregada da fonte real.':'Text response loaded from the real source.', rows:[{label:'preview', value:clean||'—'}]};
+  }
+  async runClimwebEndpoint(module){
+    const L=this.state.lang, url=this.previewEndpoint(module);
+    if(!module||!url) return;
+    this.setState({selectedClimwebKey:module.key, climwebActionLoading:true, climwebActionResult:null});
+    const ctl=('AbortController' in window)?new AbortController():null;
+    const to=ctl?setTimeout(()=>ctl.abort(),12000):null;
+    try{
+      const r=await fetch(url, ctl?{signal:ctl.signal}:undefined);
+      const text=await r.text();
+      if(to) clearTimeout(to);
+      if(!r.ok) throw new Error(r.status+' '+r.statusText);
+      let payload=null; try{ payload=JSON.parse(text); }catch(e){}
+      const summary=this.summarizePayload(payload, text);
+      this.setState({climwebActionLoading:false, climwebActionResult:{ok:true,title:module.label,headline:summary.headline,url,rows:summary.rows}});
+    }catch(e){
+      if(to) clearTimeout(to);
+      this.setState({climwebActionLoading:false, climwebActionResult:{ok:false,title:module.label,headline:(L==='pt'?'Nao foi possivel ler o endpoint agora.':'Could not read the endpoint right now.'),url,rows:[{label:'erro',value:e.message||String(e)}]}});
+    }
+  }
+  climwebActionsFor(module){
+    if(!module) return [];
+    const L=this.state.lang, actions=[];
+    const unconfigured=module.state==='unconfigured';
+    actions.push({label:unconfigured?(L==='pt'?'Configurar':'Configure'):(L==='pt'?'Usar no painel':'Use in panel'), tone:'primary', onClick:()=>unconfigured?this.openUrl(module.admin_url):this.applyClimwebModule(module)});
+    const api=this.previewEndpoint(module);
+    if(api) actions.push({label:L==='pt'?'Testar fonte':'Test source', tone:'normal', onClick:()=>this.runClimwebEndpoint(module)});
+    const page=this.publicEndpoint(module);
+    if(page) actions.push({label:L==='pt'?'Abrir pagina':'Open page', tone:'normal', onClick:()=>this.openUrl(page)});
+    if(module.admin_url) actions.push({label:L==='pt'?'Admin':'Admin', tone:'normal', onClick:()=>this.openUrl(module.admin_url)});
+    return actions;
+  }
+  forecastRows(){
+    const f=this.state.live&&this.state.live.climwebForecast;
+    return (f&&Array.isArray(f.cities))?f.cities:[];
+  }
+  stationSet(){
+    const s=this.state.live&&this.state.live.climwebStations;
+    return (s&&Array.isArray(s.stations))?s.stations:[];
+  }
+  capAlertSet(){
+    const cap=this.state.live&&this.state.live.climwebCap;
+    const features=(cap&&Array.isArray(cap.features))?cap.features:[];
+    return features.map(f=>this.normCap(f)).filter(Boolean);
+  }
+  firstCoord(geom){
+    if(!geom||!geom.coordinates) return null;
+    const walk=(value)=>{
+      if(!Array.isArray(value)) return null;
+      if(value.length>=2 && typeof value[0]==='number' && typeof value[1]==='number') return value;
+      for(const item of value){ const got=walk(item); if(got) return got; }
+      return null;
+    };
+    return walk(geom.coordinates);
+  }
+  normCap(feature){
+    const p=(feature&&feature.properties)||{}, c=this.firstCoord(feature&&feature.geometry);
+    if(!c) return null;
+    const sevRaw=String(p.severity||p.urgency||p.certainty||'moderate').toLowerCase();
+    const sev=sevRaw.indexOf('extreme')>=0?'extreme':sevRaw.indexOf('severe')>=0?'severe':sevRaw.indexOf('minor')>=0?'minor':'moderate';
+    const sent=p.sent||p.effective||p.updated||p.onset||null;
+    const mins=sent?Math.max(1,Math.round((Date.now()-new Date(sent).getTime())/60000)):1;
+    const headline=p.headline||p.event||p.title||'CAP alert';
+    const area=(p.areaDesc||p.area||p.region||p.country||'CAP');
+    return { lng:+c[0], lat:+c[1], sev, type:'cap', icon:'⚠️', region:area, regionEn:area, area:p.event||'CAP',
+      pt:headline, en:headline, mins, src:'ClimWeb CAP', typeLabel:['CAP oficial','Official CAP'],
+      severityText:p.severity||null, country:p.country||null, fromDate:sent, url:p.web||p.url||p.link||null, eventId:p.identifier||p.id||null };
+  }
+  climwebRasterUrl(item){
+    if(!item||!item.id) return '';
+    const styleArg=item.prerendered?'':'&style=viridis';
+    return this.apiUrl(`/api/file-raster/${item.id}/data/region.png/?left=-180&right=180&top=90&bottom=-90&units=EPSG:4326&encoding=PNG${styleArg}`);
+  }
+  loadClimwebRasterFrames(items){
+    if(!this.three||!window.THREE||!Array.isArray(items)||!items.length){ this._climwebRasterPending=items; return; }
+    const key=items.map(i=>i.id).join(',');
+    if(this._climwebRasterKey===key) return;
+    this._climwebRasterKey=key;
+    const THREE=window.THREE, TL=new THREE.TextureLoader(); TL.setCrossOrigin('anonymous');
+    const groups={rain:[],temp:[]};
+    items.forEach(item=>{
+      const text=((item.layer||'')+' '+(item.dataset||'')).toLowerCase();
+      if(text.indexOf('precip')>=0 || text.indexOf('chuva')>=0 || text.indexOf('rain')>=0) groups.rain.push(item);
+      if(text.indexOf('temp')>=0 || text.indexOf('temperatura')>=0) groups.temp.push(item);
+    });
+    ['rain','temp'].forEach(kind=>{
+      const list=groups[kind].sort((a,b)=>String(a.time||'').localeCompare(String(b.time||''))).slice(-this.FRAMES);
+      if(!list.length) return;
+      const texKey=kind==='rain'?'rainFrames':'tempFrames';
+      this.tex[texKey]=this.tex[texKey]||new Array(this.FRAMES).fill(null);
+      this.climwebRasterFrames=this.climwebRasterFrames||{rain:{},temp:{}};
+      list.forEach((item,i)=>{
+        const idx=Math.max(0,this.FRAMES-list.length+i);
+        this.climwebRasterFrames[kind][idx]=item.time||'';
+        const url=this.climwebRasterUrl(item);
+        if(!url) return;
+        TL.load(url, t=>{ t.colorSpace=THREE.SRGBColorSpace; this.tex[texKey][idx]=t; if(this.activeDataLayer()===kind){ this.buildDataTexture(); this.applyLayers(); } }, undefined, ()=>{});
+      });
+    });
+  }
+  drawBoundaryTexture(fc){
+    const T=this.three, d3=window.d3; if(!T||!d3||!fc||!Array.isArray(fc.features)||!fc.features.length) return false;
+    const g=T.bordCanvas.getContext('2d');
+    g.clearRect(0,0,T.bordCanvas.width,T.bordCanvas.height);
+    const proj=d3.geoEquirectangular().fitSize([T.bordCanvas.width,T.bordCanvas.height],{type:'Sphere'});
+    const pth=d3.geoPath(proj,g);
+    g.lineWidth=1.35; g.strokeStyle='rgba(103,232,249,0.92)';
+    fc.features.forEach(f=>{ g.beginPath(); pth(f); g.stroke(); });
+    T.bordTex.needsUpdate=true; this.applyLayers();
+    return true;
+  }
+
+  async fetchRegions(){
+    const OM='https://api.open-meteo.com/v1/forecast';
+    try{
+      const lats=this.REGIONS.map(r=>r.lat).join(','), lngs=this.REGIONS.map(r=>r.lng).join(',');
+      const j=await this.fetchJson(`${OM}?latitude=${lats}&longitude=${lngs}&current=temperature_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min&wind_speed_unit=ms&timezone=UTC&forecast_days=1`);
+      const regions=this.REGIONS.map((reg,i)=>{ const d=Array.isArray(j)?j[i]:j; const cur=d.current, day=d.daily; const w=this.wmo(cur.weather_code);
+        return { city:reg.city, zonePt:reg.zonePt, zoneEn:reg.zoneEn, lat:reg.lat, lng:reg.lng,
+          icon:w[0], condPt:w[1], condEn:w[2], temp:Math.round(cur.temperature_2m),
+          hi:Math.round(day.temperature_2m_max[0]), lo:Math.round(day.temperature_2m_min[0]), wind:Math.round(cur.wind_speed_10m) }; });
+      this.patchLive({ regions, regionsUpdated:Date.now() });
+    }catch(e){}
+  }
+
+  async fetchNowcast(locOverride){
+    const OM='https://api.open-meteo.com/v1/forecast';
+    const AQ='https://air-quality-api.open-meteo.com/v1/air-quality';
+    const loc=locOverride||(this.state.live&&this.state.live.nowcastLoc)||{lat:-23.55,lng:-46.63,label:'São Paulo'};
+    const reg={lat:loc.lat, lng:loc.lng, city:loc.label};
+    try{
+      const j=await this.fetchJson(`${OM}?latitude=${reg.lat}&longitude=${reg.lng}&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,surface_pressure,relative_humidity_2m,uv_index&hourly=temperature_2m,precipitation_probability,weather_code,surface_pressure&daily=temperature_2m_max,precipitation_sum&wind_speed_unit=ms&timezone=UTC&forecast_days=2&past_days=14`);
+      const cur=j.current, H=j.hourly, D=j.daily;
+      const nowISO=new Date().toISOString().slice(0,13);
+      let idx=H.time.findIndex(t=>t.slice(0,13)===nowISO); if(idx<0) idx=14*24;
+      const next=[]; for(let k=0;k<12;k++){ const m=idx+k; if(m<H.time.length){ const w=this.wmo(H.weather_code[m]);
+        next.push({ t:Math.round(H.temperature_2m[m]), pop:H.precipitation_probability[m]||0, icon:w[0], time:H.time[m] }); } }
+      const w=this.wmo(cur.weather_code);
+      // REAL recent surface-pressure trend (last ~14 hourly readings up to now)
+      const pTrend=[]; for(let k=13;k>=0;k--){ const m=idx-k; if(m>=0&&m<H.surface_pressure.length&&H.surface_pressure[m]!=null) pTrend.push(+H.surface_pressure[m].toFixed(1)); }
+      const pDelta = pTrend.length>=2 ? +(pTrend[pTrend.length-1]-pTrend[0]).toFixed(1) : 0;
+      const nowcast={ city:reg.city, temp:Math.round(cur.temperature_2m), icon:w[0], condPt:w[1], condEn:w[2],
+        wind:Math.round(cur.wind_speed_10m), windDir:cur.wind_direction_10m, gust:cur.wind_gusts_10m!=null?Math.round(cur.wind_gusts_10m):null,
+        pressure:Math.round(cur.surface_pressure), pressTrend:pTrend, pressDelta:pDelta,
+        humidity:cur.relative_humidity_2m, pop:(next[0]&&next[0].pop)||0, hours:next };
+      const tHi=[]; for(let d=0; d<15; d++){ let mx=-99; for(let h=0; h<24; h++){ const m=d*24+h; if(m<H.temperature_2m.length){ mx=Math.max(mx,H.temperature_2m[m]); } } tHi.push(mx>-99?mx:null); }
+      // REAL daily max temperature + precipitation totals, filtered to observed dates only.
+      const today = new Date().toISOString().slice(0,10);
+      let dailyRows = [];
+      if(D&&D.time&&D.temperature_2m_max){
+        dailyRows = D.time.map((time,i)=>({ time, temp:D.temperature_2m_max[i], precip:D.precipitation_sum?D.precipitation_sum[i]:null }))
+          .filter(row=>row.time<=today && row.temp!=null)
+          .slice(-14);
+      }
+      const dailyT = dailyRows.length ? dailyRows.map(row=>row.temp) : tHi.filter(v=>v!=null).slice(-14);
+      const dailyP = dailyRows.length ? dailyRows.map(row=>row.precip==null?0:row.precip) : null;
+      const trends={ tempHi:dailyT, precip:dailyP, times:dailyRows.map(row=>row.time), updated:new Date().toISOString(), source:'Open-Meteo Forecast API' };
+      this.patchLive({ nowcast, trends, nowcastError:null }, ()=>{ if(this.activeDataLayer()) this.buildDataTexture(); });
+    }catch(e){
+      const msg=(e&&e.message)||String(e||'');
+      this.patchLive({ nowcastError:msg.indexOf('429')>=0?'rate_limit':'error' });
+    }
+    // air quality is a separate endpoint — fetch independently so it can't block the nowcast
+    try{
+      const a=await this.fetchJson(`${AQ}?latitude=${reg.lat}&longitude=${reg.lng}&current=us_aqi,pm2_5,uv_index&timezone=UTC`);
+      if(a.current){ this.patchLive({ indices:{ uv: a.current.uv_index!=null?+a.current.uv_index.toFixed(1):(this.state.live.indices?this.state.live.indices.uv:0), aqi:a.current.us_aqi||0, pm:a.current.pm2_5!=null?+a.current.pm2_5.toFixed(1):0 } }); }
+    }catch(e){}
+  }
+
+  async fetchAlerts(){
+    const alerts=[];
+    try{ const j=await this.fetchJson('https://www.gdacs.org/gdacsapi/api/events/geteventlist/EVENTS4APP', 12000);
+      (j.features||[]).forEach(f=>{ const p=f.properties, g=f.geometry; if(!g||!g.coordinates) return; alerts.push(this.normGdacs(p, g.coordinates)); });
+    }catch(e){}
+    try{ const j=await this.fetchJson('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_day.geojson', 12000);
+      (j.features||[]).slice(0,40).forEach(f=>{ const p=f.properties, c=f.geometry.coordinates; alerts.push(this.normUsgs(p,c)); });
+    }catch(e){}
+    if(alerts.length){
+      const order={extreme:0,severe:1,moderate:2,minor:3};
+      alerts.sort((a,b)=> (order[a.sev]-order[b.sev]) || (a.mins-b.mins));
+      this.patchLive({ externalAlerts: alerts.slice(0,60) }, ()=>this.refreshAlertMarkers());
+    }
+  }
+
+  normGdacs(p, coords){
+    const type=p.eventtype, lvl=(p.alertlevel||'Green').toLowerCase();
+    const sev = lvl==='red'?'extreme' : lvl==='orange'?'severe' : 'moderate';
+    const types={ EQ:['🌍','Terremoto','Earthquake'], TC:['🌀','Ciclone tropical','Tropical cyclone'], FL:['🌊','Inundação','Flood'],
+      DR:['🏜️','Seca','Drought'], VO:['🌋','Vulcão','Volcano'], WF:['🔥','Incêndio florestal','Wildfire'], TS:['🌊','Tsunami','Tsunami'] };
+    const tm=types[type]||['⚠️','Evento','Event'];
+    const name=p.name||p.htmldescription||p.country||tm[2];
+    const t0=p.fromdate?new Date(p.fromdate):new Date();
+    return { lng:coords[0], lat:coords[1], sev, type, icon:tm[0], region:p.country||'—', regionEn:p.country||'—',
+      area:tm[1], pt:tm[1]+(p.country?(' · '+p.country):'')+(p.severitydata&&p.severitydata.severitytext?(' — '+p.severitydata.severitytext):''),
+      en:tm[2]+(p.country?(' · '+p.country):''), mins:Math.max(1,Math.round((Date.now()-t0.getTime())/60000)), src:'GDACS',
+      typeLabel:[tm[1],tm[2]], country:p.country||null, name:p.name||null,
+      severityText:(p.severitydata&&p.severitydata.severitytext)||null, alertLevel:(p.alertlevel||null),
+      fromDate:p.fromdate||null, url:p.url&&(p.url.report||p.url.details)||p.link||null, eventId:p.eventid||null };
+  }
+  normUsgs(p, c){
+    const mag=p.mag||0; const sev = mag>=6.5?'extreme' : mag>=5.5?'severe' : mag>=4.8?'moderate' : 'minor';
+    return { lng:c[0], lat:c[1], sev, type:'EQ', icon:'🌍', region:p.place||'—', regionEn:p.place||'—', area:'M '+mag.toFixed(1),
+      pt:'Terremoto M'+mag.toFixed(1)+' — '+(p.place||''), en:'M'+mag.toFixed(1)+' earthquake — '+(p.place||''),
+      mins:Math.max(1,Math.round((Date.now()-p.time)/60000)), src:'USGS',
+      typeLabel:['Terremoto','Earthquake'], mag:mag, depth:(c[2]!=null?Math.round(c[2]):null), felt:p.felt||null,
+      tsunami:p.tsunami?1:0, fromDate:p.time||null, url:p.url||null, eventId:p.ids||null };
+  }
+
+  // real wind grid -> merges into live.windGrid.
+  // Preferred source: ClimWeb's shared server cache (/api/climasphere/windgrid) — one
+  // upstream fetch per hour serves every visitor. Direct Open-Meteo only as fallback
+  // (e.g. when the panel runs standalone without the ClimWeb backend).
+  async fetchWindGrid(){
+    try{
+      const j=await this.fetchJson('/api/climasphere/windgrid', 15000);
+      if(j && Array.isArray(j.grid) && j.grid.length){
+        this.patchLive({ windGrid:j.grid, windUpdated:Date.now() });
+        return;
+      }
+    }catch(e){}
+    const OM='https://api.open-meteo.com/v1/forecast';
+    try{
+      const la=[], lo=[]; for(let y=-75; y<=75; y+=15){ for(let x=-165; x<=165; x+=18){ la.push(y); lo.push(x); } }
+      const r=await fetch(`${OM}?latitude=${la.join(',')}&longitude=${lo.join(',')}&current=wind_speed_10m,wind_direction_10m&wind_speed_unit=ms&timezone=UTC&forecast_days=1`);
+      const j=await r.json();
+      const grid=j.map((d,i)=>{ const s=(d.current&&d.current.wind_speed_10m)||0, dir=(d.current&&d.current.wind_direction_10m)||0;
+        const toDir=(dir+180)*Math.PI/180; return { lat:la[i], lng:lo[i], s, u:Math.sin(toDir)*s, v:Math.cos(toDir)*s }; });
+      this.patchLive({ windGrid:grid, windUpdated:Date.now() });
+    }catch(e){}
+  }
+
+  // independent, denser real wind grid placeholder ends here
+  async _noop(){}
+
+  // current alert set: official CAP first, then labeled external feeds. No synthetic operational data.
+  alertSet(){
+    const cap=this.capAlertSet();
+    const ext=(this.state.live&&this.state.live.externalAlerts)||[];
+    return cap.concat(ext).slice(0,80);
+  }
+
+  loadGibs(){
+    if(!this.three || !window.THREE) { this._gibsPending=true; return; }
+    const THREE=window.THREE;
+    const date=new Date(Date.now()-2*86400000).toISOString().slice(0,10); // 2 days back = reliably published
+    this.gibsDate=date;
+    const base='https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&CRS=EPSG:4326&BBOX=-90,-180,90,180';
+    const TL=new THREE.TextureLoader(); TL.setCrossOrigin('anonymous');
+    const grab=(layer,fmt,w,h,key,time,after)=>{
+      const url=`${base}&LAYERS=${layer}&WIDTH=${w}&HEIGHT=${h}&FORMAT=${fmt}${fmt.indexOf('png')>=0?'&TRANSPARENT=true':''}${time?('&TIME='+time):''}`;
+      TL.load(url, t=>{ t.colorSpace=THREE.SRGBColorSpace; this.tex[key]=t; after&&after(); }, undefined, ()=>{});
+    };
+    // real cloud-free NASA Blue Marble Next Generation base (true land/ocean colour, fills no-data gaps)
+    grab('BlueMarble_NextGeneration','image/jpeg',2048,1024,'dayReal',null,()=>{ if(this.state.activeLayers.satellite) this.applyLayers(); this.forceUpdate&&this.forceUpdate(); });
+    // real land-surface temperature (MODIS Terra LST, day) — transparent no-data
+    grab('MODIS_Terra_Land_Surface_Temp_Day','image/png',2048,1024,'tempReal',date,()=>{ if(this.state.activeLayers.temp){ this.buildDataTexture(); this.applyLayers(); } });
+    // real precipitation rate (GPM IMERG) — global, half-hourly
+    grab('IMERG_Precipitation_Rate','image/png',2048,1024,'rainReal',date,()=>{ if(this.state.activeLayers.rain){ this.buildDataTexture(); this.applyLayers(); } });
+    // ---- REAL animated cloud frames: last N days of MODIS Terra true-color (oldest -> newest) ----
+    const N=8; this.tex.frames=new Array(N).fill(null); this.gibsFrames=new Array(N).fill(null);
+    for(let k=0;k<N;k++){
+      const day=new Date(Date.now()-(2+(N-1-k))*86400000).toISOString().slice(0,10);
+      const url=`${base}&LAYERS=MODIS_Terra_CorrectedReflectance_TrueColor&WIDTH=1536&HEIGHT=768&FORMAT=image/jpeg&TIME=${day}`;
+      ((idx,d)=>{ TL.load(url, t=>{ t.colorSpace=THREE.SRGBColorSpace; this.tex.frames[idx]=t; this.gibsFrames[idx]=d;
+        if(this.cloudFrame){ const u=this.cloudFrame.mat.uniforms; if(u.hasF.value<0.5){ u.tA.value=t; u.tB.value=t; u.hasF.value=1; } }
+        this.forceUpdate&&this.forceUpdate(); }, undefined, ()=>{}); })(k,day);
+    }
+  }
+
+  // (re)build globe alert beacons from the current alert set (real GDACS/USGS or seed)
+  refreshAlertMarkers(){
+    const THREE=window.THREE; if(!THREE || !this.alertGroup || !this.alertTex) return;
+    // clear existing
+    while(this.alertGroup.children.length){ const c=this.alertGroup.children.pop(); if(c.material) c.material.dispose(); this.alertGroup.remove(c); }
+    this.alertSprites=[];
+    const set=this.alertSet();
+    set.forEach(al=>{
+      if(al.lat==null||al.lng==null) return;
+      const m=this.sevMeta(al.sev)||this.sevMeta('moderate');
+      const p=this.llv(al.lat,al.lng,1.02);
+      const halo=new THREE.Sprite(new THREE.SpriteMaterial({ map:this.alertTex.halo, color:new THREE.Color(m.c), transparent:true, depthTest:true, depthWrite:false, blending:THREE.AdditiveBlending }));
+      halo.position.copy(p); halo.scale.setScalar(0.05);
+      const core=new THREE.Sprite(new THREE.SpriteMaterial({ map:this.alertTex.core, color:new THREE.Color(m.c), transparent:true, depthTest:true, depthWrite:false }));
+      core.position.copy(p);
+      const sz = al.sev==='extreme'?0.05 : al.sev==='severe'?0.044 : al.sev==='moderate'?0.038 : 0.03;
+      core.scale.setScalar(sz);
+      core.userData={al, halo, base:sz}; this.alertGroup.add(halo); this.alertGroup.add(core); this.alertSprites.push(core);
+    });
+    this.renderOnce&&this.renderOnce();
+  }
+
+  refreshStationMarkers(){
+    const THREE=window.THREE; if(!THREE || !this.stationGroup) return;
+    while(this.stationGroup.children.length){ const c=this.stationGroup.children.pop(); if(c.material) c.material.dispose(); this.stationGroup.remove(c); }
+    this.stationSprites=[];
+    if(!this.stationTex){
+      const c=document.createElement('canvas'); c.width=c.height=48; const g=c.getContext('2d');
+      const gr=g.createRadialGradient(22,20,2,24,24,20); gr.addColorStop(0,'#ffffff'); gr.addColorStop(0.45,'#67e8f9'); gr.addColorStop(1,'rgba(103,232,249,0)');
+      g.fillStyle=gr; g.beginPath(); g.arc(24,24,20,0,7); g.fill();
+      this.stationTex=new THREE.CanvasTexture(c);
+    }
+    this.stationSet().slice(0,900).forEach(st=>{
+      if(st.lat==null||st.lon==null) return;
+      const p=this.llv(+st.lat,+st.lon,1.018);
+      const s=new THREE.Sprite(new THREE.SpriteMaterial({map:this.stationTex,color:new THREE.Color('#67e8f9'),transparent:true,depthTest:true,depthWrite:false,opacity:0.82}));
+      s.position.copy(p); s.scale.setScalar(0.018); s.userData={station:st}; this.stationGroup.add(s); this.stationSprites.push(s);
+    });
+    this.renderOnce&&this.renderOnce();
+  }
+  componentDidUpdate(){ this.drawTrendCanvas(); this.drawPressureCanvas(); }
+  componentWillUnmount(){ clearInterval(this.tick); if(this._refresh) clearInterval(this._refresh); if(this._raf) cancelAnimationFrame(this._raf); if(this.satTimer) this.satTimer.stop(); if(this._globeCleanup) this._globeCleanup(); if(this.ro) this.ro.disconnect(); }
+
+  drawTrendCanvas(){
+    const canvas=this.trendRef&&this.trendRef.current, data=this._trendCanvasData;
+    if(!canvas||!data) return;
+    const g=canvas.getContext('2d'); if(!g) return;
+    const W=canvas.width, H=canvas.height, sx=W/320, sy=H/150;
+    g.clearRect(0,0,W,H);
+    g.strokeStyle='#eef3f1'; g.lineWidth=1;
+    [40,80,120].forEach(y=>{ g.beginPath(); g.moveTo(0,y*sy); g.lineTo(W,y*sy); g.stroke(); });
+    (data.precipBars||[]).forEach(b=>{
+      const x=parseFloat(b.x)*sx, y=parseFloat(b.y)*sy, w=parseFloat(b.w)*sx, h=parseFloat(b.h)*sy;
+      g.fillStyle='#bcdcfa'; g.globalAlpha=0.92;
+      g.beginPath(); g.roundRect(x,y,Math.max(1,w),Math.max(0,h),4); g.fill();
+    });
+    const pts=data.tempPts||[];
+    if(pts.length){
+      g.globalAlpha=1;
+      g.beginPath(); pts.forEach((p,i)=>{ const x=p[0]*sx, y=p[1]*sy; i?g.lineTo(x,y):g.moveTo(x,y); });
+      g.lineTo(pts[pts.length-1][0]*sx,H); g.lineTo(pts[0][0]*sx,H); g.closePath();
+      g.fillStyle='rgba(249,115,22,0.08)'; g.fill();
+      g.beginPath(); pts.forEach((p,i)=>{ const x=p[0]*sx, y=p[1]*sy; i?g.lineTo(x,y):g.moveTo(x,y); });
+      g.strokeStyle='#f97316'; g.lineWidth=4.8; g.lineJoin='round'; g.lineCap='round'; g.stroke();
+      pts.forEach(p=>{ g.beginPath(); g.fillStyle='#fff'; g.strokeStyle='#f97316'; g.lineWidth=3.2; g.arc(p[0]*sx,p[1]*sy,4.6,0,Math.PI*2); g.fill(); g.stroke(); });
+    }
+    g.globalAlpha=1;
+  }
+
+  drawPressureCanvas(){
+    const canvas=this.pressRef&&this.pressRef.current, pts=this._pressCanvasData;
+    if(!canvas||!pts||!pts.length) return;
+    const g=canvas.getContext('2d'); if(!g) return;
+    const W=canvas.width, H=canvas.height, sx=W/220, sy=H/60;
+    g.clearRect(0,0,W,H);
+    g.beginPath(); pts.forEach((p,i)=>{ const x=p[0]*sx, y=p[1]*sy; i?g.lineTo(x,y):g.moveTo(x,y); });
+    g.lineTo(W,H); g.lineTo(0,H); g.closePath();
+    g.fillStyle='rgba(168,85,247,0.08)'; g.fill();
+    g.beginPath(); pts.forEach((p,i)=>{ const x=p[0]*sx, y=p[1]*sy; i?g.lineTo(x,y):g.moveTo(x,y); });
+    g.strokeStyle='#a855f7'; g.lineWidth=4.4; g.lineCap='round'; g.lineJoin='round'; g.stroke();
+  }
+
+  // ---- lat/lng -> point on unit sphere (matches three SphereGeometry equirect UV) ----
+  llv(lat,lng,r){
+    const THREE=window.THREE; const phi=(90-lat)*Math.PI/180, theta=(lng+180)*Math.PI/180;
+    return new THREE.Vector3(-r*Math.sin(phi)*Math.cos(theta), r*Math.cos(phi), r*Math.sin(phi)*Math.sin(theta));
+  }
+
+  initGlobe(){
+    const THREE=window.THREE, d3=window.d3, topojson=window.topojson, canvas=this.globeRef.current;
+    if(!canvas||!THREE) return;
+    let w=canvas.clientWidth||800, h=canvas.clientHeight||600;
+    const dpr=Math.min(window.devicePixelRatio||1,2);
+
+    const renderer=new THREE.WebGLRenderer({canvas, antialias:true, alpha:true, preserveDrawingBuffer:true});
+    renderer.setPixelRatio(dpr); renderer.setSize(w,h,false);
+    const scene=new THREE.Scene();
+    const camera=new THREE.PerspectiveCamera(38, w/h, 0.1, 100);
+    this.camDist=3.0; camera.position.set(0,0,this.camDist);
+
+    // sun direction (drives terminator shader + sun sprite). Materials are UNLIT
+    // (MeshBasic / custom shaders) so rendering never depends on scene lights — this
+    // avoids the "multiple THREE instances" lighting breakage and is fully reliable.
+    const group=new THREE.Group(); scene.add(group);
+    this.globeGroup=group;
+
+    // base earth sphere (unlit, full-brightness real imagery)
+    const geo=new THREE.SphereGeometry(1,96,96);
+    const mat=new THREE.MeshBasicMaterial({ color:0x16324a });
+    const earth=new THREE.Mesh(geo,mat); group.add(earth);
+
+    // ---- REAL animated imagery shell: smoothly blends consecutive real NASA true-color frames
+    //      (last N days of MODIS Terra) so clouds genuinely MOVE through REAL data, DSAT-style. ----
+    const frameMat=new THREE.ShaderMaterial({
+      transparent:true, depthWrite:false,
+      uniforms:{ tA:{value:null}, tB:{value:null}, mixv:{value:0}, hasF:{value:0}, uOn:{value:1}, uOp:{value:1} },
+      vertexShader:'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+      fragmentShader:'varying vec2 vUv; uniform sampler2D tA; uniform sampler2D tB; uniform float mixv; uniform float hasF; uniform float uOn; uniform float uOp; void main(){ if(hasF<0.5||uOn<0.5) discard; vec3 a=texture2D(tA,vUv).rgb; vec3 b=texture2D(tB,vUv).rgb; vec3 c=mix(a,b,mixv); float w=min(min(c.r,c.g),c.b); float al=smoothstep(0.38,0.72,w)*uOp; if(al<0.02) discard; gl_FragColor=vec4(c, al); }'
+    });
+    const frameShell=new THREE.Mesh(new THREE.SphereGeometry(1.0022,96,96), frameMat); group.add(frameShell);
+    this.cloudFrame={ mat:frameMat, phase:0 };
+
+    // data overlay shell (temp/rain)
+    const dataCanvas=document.createElement('canvas'); dataCanvas.width=512; dataCanvas.height=256;
+    const dataTex=new THREE.CanvasTexture(dataCanvas);
+    const dataMat=new THREE.MeshBasicMaterial({ map:dataTex, transparent:true, opacity:0.0, depthWrite:false });
+    const dataShell=new THREE.Mesh(new THREE.SphereGeometry(1.006,96,96), dataMat); group.add(dataShell);
+
+    // borders shell (built from topojson)
+    const bordCanvas=document.createElement('canvas'); bordCanvas.width=2048; bordCanvas.height=1024;
+    const bordTex=new THREE.CanvasTexture(bordCanvas);
+    const bordMat=new THREE.MeshBasicMaterial({ map:bordTex, transparent:true, opacity:0.0, depthWrite:false });
+    const bordShell=new THREE.Mesh(new THREE.SphereGeometry(1.004,96,96), bordMat); group.add(bordShell);
+
+    // atmosphere glow (backside sphere)
+    const atmoMat=new THREE.ShaderMaterial({
+      transparent:true, side:THREE.BackSide, depthWrite:false,
+      uniforms:{ c1:{value:new THREE.Color(0x4fd6c0)}, c2:{value:new THREE.Color(0x1b6cff)} },
+      vertexShader:'varying vec3 vN; void main(){ vN=normalize(normalMatrix*normal); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+      fragmentShader:'varying vec3 vN; uniform vec3 c1; uniform vec3 c2; void main(){ float i=pow(0.72-dot(vN,vec3(0.,0.,1.)),3.0); vec3 col=mix(c2,c1,clamp(i,0.,1.)); gl_FragColor=vec4(col,1.0)*clamp(i,0.,1.); }'
+    });
+    const atmo=new THREE.Mesh(new THREE.SphereGeometry(1.16,64,64), atmoMat); group.add(atmo);
+
+    // ---- wind streamlines (nullschool-style flow lines hugging the sphere) ----
+    // Each particle draws a short multi-segment trail that fades along its length;
+    // depthTest occludes the far hemisphere so nothing "floats".
+    const WMAX=this.WIND_DENSITY.muito;       // max particles
+    const TRAIL=5;                            // points per trail
+    const segs=TRAIL-1;                        // segments per trail
+    const windGeo=new THREE.BufferGeometry();
+    const wpos=new Float32Array(WMAX*segs*2*3);
+    const wcol=new Float32Array(WMAX*segs*2*3);
+    windGeo.setAttribute('position', new THREE.BufferAttribute(wpos,3));
+    windGeo.setAttribute('color', new THREE.BufferAttribute(wcol,3));
+    const windMat=new THREE.LineBasicMaterial({ vertexColors:true, transparent:true, opacity:0.62, depthWrite:false, blending:THREE.AdditiveBlending });
+    const windLines=new THREE.LineSegments(windGeo, windMat); windLines.visible=false; group.add(windLines);
+    this.wind={ lines:windLines, geo:windGeo, pos:wpos, col:wcol, parts:[], TRAIL, segs };
+    for(let i=0;i<WMAX;i++){ this.wind.parts.push({lng:Math.random()*360-180, lat:Math.random()*150-75, age:Math.random()*100, trail:[]}); }
+
+    // ---- sun direction holder only (terminator handled by shader shells; no glowing sprite) ----
+    this.sunObj={};
+
+    // alert sprites
+    const alertGroup=new THREE.Group(); group.add(alertGroup);
+    // crisp bead (bright center -> darker rim, hard edge) tinted per severity
+    const coreTex=(()=>{ const c=document.createElement('canvas'); c.width=c.height=64; const g=c.getContext('2d');
+      const gr=g.createRadialGradient(28,26,2,32,32,30); gr.addColorStop(0,'#ffffff'); gr.addColorStop(0.45,'#ffffff'); gr.addColorStop(0.8,'#9aa0a6'); gr.addColorStop(0.97,'#5b6064'); gr.addColorStop(1,'rgba(0,0,0,0)');
+      g.fillStyle=gr; g.beginPath(); g.arc(32,32,30,0,7); g.fill(); return new THREE.CanvasTexture(c); })();
+    // expanding halo ring (the "beacon" ping)
+    const haloTex=(()=>{ const c=document.createElement('canvas'); c.width=c.height=64; const g=c.getContext('2d');
+      g.strokeStyle='#fff'; g.lineWidth=6; g.beginPath(); g.arc(32,32,22,0,7); g.stroke();
+      const gr=g.createRadialGradient(32,32,14,32,32,30); gr.addColorStop(0,'rgba(255,255,255,0)'); gr.addColorStop(0.7,'rgba(255,255,255,0.5)'); gr.addColorStop(1,'rgba(255,255,255,0)');
+      g.globalCompositeOperation='source-in'; g.fillStyle=gr; g.fillRect(0,0,64,64); return new THREE.CanvasTexture(c); })();
+    this.alertTex={ core:coreTex, halo:haloTex };
+    this.alertSprites=[];
+    this.alertGroup=alertGroup;
+    this.refreshAlertMarkers();
+
+    const stationGroup=new THREE.Group(); group.add(stationGroup);
+    this.stationGroup=stationGroup;
+    this.stationSprites=[];
+    this.refreshStationMarkers();
+
+    this.three={ renderer, scene, camera, group, earth, mat, frameShell, frameMat, dataShell, dataMat, dataTex, dataCanvas, bordShell, bordMat, bordTex, bordCanvas, atmo };
+
+    // ---- textures (real imagery) ----
+    const TL=new THREE.TextureLoader(); TL.setCrossOrigin('anonymous');
+    const base='https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/textures/planets/';
+    this.tex={};
+    const load=(url,cb)=>TL.load(url,t=>{ t.colorSpace=THREE.SRGBColorSpace; cb&&cb(t); this.applyLayers(); },undefined,()=>{});
+    this.tex.day   = load(base+'earth_atmos_2048.jpg');
+
+    // ---- borders texture from topojson (equirectangular) ----
+    fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json').then(r=>r.json()).then(world=>{
+      const mesh=topojson.mesh(world,world.objects.countries,(a,b)=>a!==b);
+      const proj=d3.geoEquirectangular().fitSize([bordCanvas.width,bordCanvas.height],{type:'Sphere'});
+      const g=bordCanvas.getContext('2d'); g.clearRect(0,0,bordCanvas.width,bordCanvas.height);
+      const pth=d3.geoPath(proj,g); g.lineWidth=1.4; g.strokeStyle='rgba(120,232,255,0.9)'; g.beginPath(); pth(mesh); g.stroke();
+      bordTex.needsUpdate=true; this.applyLayers();
+    }).catch(()=>{});
+    if(this.state.live&&this.state.live.climwebBoundaries) this.drawBoundaryTexture(this.state.live.climwebBoundaries);
+
+    // initial overlay + view
+    this.buildDataTexture();
+    group.quaternion.copy(this.viewQuat(8,20));   // center on Africa/Europe
+    this.applyLayers();
+    // if loadGibs() was called before the 3D scene existed, run it now (real NASA imagery)
+    if(this._gibsPending){ this._gibsPending=false; this.loadGibs(); }
+    if(this._climwebRasterPending){ const pending=this._climwebRasterPending; this._climwebRasterPending=null; this.loadClimwebRasterFrames(pending); }
+
+    // ---- resize ----
+    const resize=()=>{ w=canvas.clientWidth||800; h=canvas.clientHeight||600; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); camera.clearViewOffset(); };
+    this._resize=resize; resize();
+    this.ro=new ResizeObserver(resize); this.ro.observe(canvas);
+
+    // ---- drag to rotate (quaternion, no auto-rotation) ----
+    let dragging=false, px=0, py=0;
+    const down=e=>{ dragging=true; this.dragging=true; this._dragMoved=false; this.targetQuat=null; const t=e.touches?e.touches[0]:e; px=t.clientX; py=t.clientY; canvas.style.cursor='grabbing'; };
+    const move=e=>{ if(!dragging) return; const t=e.touches?e.touches[0]:e; const dx=t.clientX-px, dy=t.clientY-py; px=t.clientX; py=t.clientY;
+      if(Math.abs(dx)+Math.abs(dy)>2) this._dragMoved=true;
+      const k=0.005*(this.camDist/3);
+      const qy=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), dx*k);
+      const qx=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0), dy*k);
+      group.quaternion.premultiply(qy).premultiply(qx);
+      if(e.cancelable) e.preventDefault();
+    };
+    const up=()=>{ dragging=false; this.dragging=false; canvas.style.cursor='grab'; };
+    canvas.addEventListener('mousedown',down); window.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
+    canvas.addEventListener('touchstart',down,{passive:true}); canvas.addEventListener('touchmove',move,{passive:false}); window.addEventListener('touchend',up);
+    canvas.addEventListener('wheel',e=>{ e.preventDefault(); this.camDist=Math.max(1.55,Math.min(4.2,this.camDist*(1+Math.sign(e.deltaY)*0.08))); },{passive:false});
+
+    // ---- hover over alert beacons: raycast + HTML tooltip (no React churn) ----
+    const ray=new THREE.Raycaster(); const ndc=new THREE.Vector2();
+    const hoverMove=e=>{
+      const tip=this.globeTipRef.current; if(!tip) return;
+      if(dragging || !this.state.activeLayers.alerts || !this.alertSprites || !this.alertSprites.length){ tip.style.display='none'; canvas.style.cursor=dragging?'grabbing':'grab'; return; }
+      const r=canvas.getBoundingClientRect();
+      ndc.x=((e.clientX-r.left)/r.width)*2-1; ndc.y=-((e.clientY-r.top)/r.height)*2+1;
+      ray.setFromCamera(ndc, camera);
+      ray.params.Sprite={}; ray.near=0; ray.far=100;
+      const vis=this.alertSprites.filter(s=>s.visible);
+      const hits=ray.intersectObjects(vis,false);
+      // keep only front-hemisphere beacons (not occluded by the globe)
+      const camDir=camera.position.clone().normalize();
+      let hit=null;
+      for(const h of hits){ const wp=h.object.getWorldPosition(new THREE.Vector3()); if(wp.normalize().dot(camDir)>0.12){ hit=h.object; break; } }
+      if(hit){
+        const al=hit.userData.al; const L=this.state.lang; const m=this.sevMeta(al.sev)||this.sevMeta('moderate');
+        const typeL = al.typeLabel?(L==='pt'?al.typeLabel[0]:al.typeLabel[1]):(al.area||'');
+        const head = L==='pt'?al.pt:al.en;
+        const region = L==='pt'?al.region:al.regionEn;
+        const sevL = L==='pt'?m.pt:m.en;
+        tip.innerHTML='<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">'
+          +'<span style="font-size:15px">'+al.icon+'</span>'
+          +'<span style="font-family:\'IBM Plex Mono\',monospace;font-size:9px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#fff;background:'+m.c+';padding:2px 6px;border-radius:5px">'+sevL+'</span>'
+          +'<span style="font-family:\'IBM Plex Mono\',monospace;font-size:9.5px;color:#9fc3b6">'+typeL+'</span></div>'
+          +'<div style="font-family:\'Space Grotesk\',sans-serif;font-weight:600;font-size:12.5px;color:#fff;line-height:1.25;margin-bottom:3px">'+head+'</div>'
+          +'<div style="font-size:10.5px;color:#9fc3b6;display:flex;align-items:center;gap:4px">📍 '+region+' · '+this.fmtAgo(al.mins,L)+'</div>'
+          +'<div style="font-family:\'IBM Plex Mono\',monospace;font-size:9px;color:#6f9c8d;margin-top:5px">'+(L==='pt'?'clique para detalhes':'click for details')+'</div>';
+        let lx=e.clientX-r.left+14, ly=e.clientY-r.top+14;
+        if(lx>r.width-210) lx=e.clientX-r.left-200;
+        if(ly>r.height-110) ly=e.clientY-r.top-100;
+        tip.style.left=lx+'px'; tip.style.top=ly+'px'; tip.style.display='block';
+        canvas.style.cursor='pointer'; this._hoverAlert=al;
+      } else { tip.style.display='none'; this._hoverAlert=null; if(!dragging) canvas.style.cursor='grab'; }
+    };
+    canvas.addEventListener('mousemove', hoverMove);
+    canvas.addEventListener('mouseleave', ()=>{ const tip=this.globeTipRef.current; if(tip) tip.style.display='none'; this._hoverAlert=null; });
+    // click a hovered beacon -> open its detail modal
+    canvas.addEventListener('click', ()=>{ if(this._hoverAlert && !this._dragMoved){ this.openAlert(this._hoverAlert); } });
+
+    this._globeCleanup=()=>{ window.removeEventListener('mousemove',move); window.removeEventListener('mouseup',up); window.removeEventListener('touchend',up); };
+
+    // ---- render loop ----
+    const clock=new THREE.Clock();
+    let frameAcc=0;
+    const tick=()=>{
+      const dt=Math.min(0.05, clock.getDelta());
+      const t=clock.elapsedTime;
+      if(this.targetQuat){ group.quaternion.slerp(this.targetQuat,0.12); if(group.quaternion.angleTo(this.targetQuat)<0.01) this.targetQuat=null; }
+      const a=this.state.activeLayers;
+      // gentle globe auto-rotation (life) — pauses while dragging or flying to a target
+      if(this.state.spin && !this.dragging && !this.targetQuat){ group.rotateOnWorldAxis(new THREE.Vector3(0,1,0), dt*0.05); }
+      // ---- UNIFIED TIME CLOCK: one phase drives clouds + temp + rain + the timestamp ----
+      const cf=this.cloudFrame;
+      if(cf){
+        const N=this.FRAMES;
+        if(this.state.playing) cf.phase += dt*0.22;            // advance through real daily frames
+        const ph=((cf.phase%N)+N)%N; const i0=Math.floor(ph); const i1=(i0+1)%N;
+        // clouds: blend the two real true-color frames
+        frameShell.visible=a.clouds;
+        const frames=(this.tex&&this.tex.frames)||[]; const loaded=frames.filter(Boolean);
+        if(a.clouds && loaded.length>=1){
+          cf.mat.uniforms.uOn.value=1; cf.mat.uniforms.uOp.value=(this.state.opacity==null?100:this.state.opacity)/100;
+          cf.mat.uniforms.tA.value=frames[i0]||loaded[0]; cf.mat.uniforms.tB.value=frames[i1]||frames[i0]||loaded[0];
+          cf.mat.uniforms.mixv.value=ph-i0; cf.mat.uniforms.hasF.value=1;
+        } else { cf.mat.uniforms.uOn.value=0; }
+        // when the integer frame changes, move temp/rain overlay + scrubber/label to it
+        if(i0!==this._curF){ this._curF=i0; this.syncFrameLayers(i0); }
+      }
+      camera.position.z += (this.camDist-camera.position.z)*0.15;
+
+      // ---- unified time clock drives clouds + temp + rain together (see cloud block below) ----
+
+      // ---- wind streamline advection (fading trails hugging the sphere) ----
+      windLines.visible=a.wind;
+      if(a.wind){
+        const N=this.WIND_DENSITY[this.state.windDensity]||2200;
+        const ph=this.state.frame*0.15;
+        const pos=this.wind.pos, col=this.wind.col, parts=this.wind.parts, TRAIL=this.wind.TRAIL, segs=this.wind.segs;
+        let w=0;
+        for(let i=0;i<N;i++){
+          const p=parts[i];
+          // seed/refresh trail history
+          if(!p.trail.length){ p.trail.push([p.lng,p.lat]); }
+          const f=this.windField(p.lng,p.lat,ph);
+          p.lng+=f.u; p.lat=Math.max(-85,Math.min(85,p.lat+f.v)); p.age+=1;
+          p.trail.push([p.lng,p.lat]); if(p.trail.length>TRAIL) p.trail.shift();
+          if(p.age>90||p.lng>180||p.lng<-180){ p.lng=Math.random()*360-180; p.lat=Math.random()*150-75; p.age=Math.random()*20; p.trail=[]; }
+          const sp=Math.min(1,f.s/28); const c=this.windColor(sp);
+          // emit segments between consecutive trail points; fade toward the tail
+          for(let k=0;k<p.trail.length-1;k++){
+            const a0=this.llv(p.trail[k][1], p.trail[k][0], 1.012);
+            const a1=this.llv(p.trail[k+1][1], p.trail[k+1][0], 1.012);
+            const fade0=(k)/segs, fade1=(k+1)/segs;          // head bright, tail dim
+            pos[w*6]=a0.x; pos[w*6+1]=a0.y; pos[w*6+2]=a0.z;
+            pos[w*6+3]=a1.x; pos[w*6+4]=a1.y; pos[w*6+5]=a1.z;
+            col[w*6]=c[0]*fade0; col[w*6+1]=c[1]*fade0; col[w*6+2]=c[2]*fade0;
+            col[w*6+3]=c[0]*fade1; col[w*6+4]=c[1]*fade1; col[w*6+5]=c[2]*fade1;
+            w++;
+          }
+        }
+        windGeo.setDrawRange(0, w*2);
+        windGeo.attributes.position.needsUpdate=true; windGeo.attributes.color.needsUpdate=true;
+      }
+
+      // pulse alerts: crisp core stays put, halo ring expands & fades (beacon)
+      alertGroup.visible=a.alerts;
+      if(a.alerts){ this.alertSprites.forEach((s,i)=>{ const vis=(this.state.sev==='all'||this.state.sev===s.userData.al.sev); s.visible=vis; const halo=s.userData.halo; halo.visible=vis;
+        const ph=(t*1.1+i*0.5)%1; halo.scale.setScalar(s.userData.base*(1+ph*2.6)); halo.material.opacity=0.6*(1-ph); }); }
+      if(this.stationGroup) this.stationGroup.visible=!!a.stations;
+      renderer.render(scene,camera);
+      this._raf=requestAnimationFrame(tick);
+    };
+    tick();
+
+    // public controls
+    this.flyTo=(lng,lat)=>{ this.targetQuat=this.viewQuat(lat,lng); };
+    this.applyZoom=(f)=>{ this.camDist=Math.max(1.55,Math.min(4.2,this.camDist/f)); };
+    this.resetView=()=>{ this.camDist=3.0; this.targetQuat=this.viewQuat(8,20); };
+  }
+
+  // quaternion that brings (lat,lng) to face the camera (+Z)
+  viewQuat(lat,lng){
+    const THREE=window.THREE; const v=this.llv(lat,lng,1).normalize();
+    return new THREE.Quaternion().setFromUnitVectors(v, new THREE.Vector3(0,0,1));
+  }
+
+  // wind field -> {u: dLng/step, v: dLat/step, s: speed m/s}. Real GFS grid if loaded, else synthetic.
+  windField(lng,lat,ph){
+    const grid=this.state.live&&this.state.live.windGrid;
+    if(grid&&grid.length){
+      // inverse-distance weight of nearest grid samples
+      let su=0,sv=0,ss=0,sw=0;
+      for(const g of grid){
+        let dlng=Math.abs(((g.lng-lng+540)%360)-180); const dlat=Math.abs(g.lat-lat);
+        const d2=dlng*dlng+dlat*dlat; if(d2>900) continue; // ~30° radius
+        const w=1/(d2+1); su+=g.u*w; sv+=g.v*w; ss+=g.s*w; sw+=w;
+      }
+      if(sw>0){ const u=su/sw, v=sv/sw, s=ss/sw;
+        // scale m/s to per-frame lng/lat advection (visual speed proportional to real speed)
+        const k=0.05; return { u:u*k, v:v*k, s }; }
+    }
+    // fallback synthetic field (used until real grid arrives)
+    const rad=Math.PI/180; const la=lat*rad;
+    let u = -Math.cos(la*3)*1.7 - 0.5;
+    let v = Math.sin((lng+ph*40)*rad*2)*0.5;
+    u += Math.sin((lat+ph*8)*0.06)*1.1;
+    v += Math.cos((lng-ph*30)*0.04 + lat*0.05)*0.9;
+    u += Math.sin((lng*0.03+lat*0.04+ph))*0.6;
+    const s=Math.sqrt(u*u+v*v)*4; // approx m/s
+    return {u, v, s};
+  }
+  windColor(t){ // CPTEC/meteorological wind scale (m/s): blue=calm -> red=strong
+    const stops=[[69,117,180],[116,173,209],[171,217,233],[224,243,248],[254,224,144],[253,174,97],[244,109,67],[165,0,38]];
+    const x=Math.max(0,Math.min(0.999,t))*(stops.length-1); const i=Math.floor(x), f=x-i;
+    const a=stops[i], b=stops[i+1]||stops[i];
+    return [(a[0]+(b[0]-a[0])*f)/255,(a[1]+(b[1]-a[1])*f)/255,(a[2]+(b[2]-a[2])*f)/255];
+  }
+  // map normalized wind magnitude (0..1) to m/s for the legend (0..60 m/s, CPTEC range)
+  windSpeedMS(t){ return Math.round(t*60); }
+  // advance the "live" satellite frame (drives clouds drift, data regen, timestamp)
+  advanceFrame(){
+    const f=this.state.frame+1;
+    this.setState({frame:f});
+    if(this.activeDataLayer()) this.buildDataTexture();
+  }
+  // load N real daily frames for a data layer (temp/rain) so it animates with the time-player
+  loadLayerFrames(layerId){
+    if(!window.THREE||!this.three) return;
+    const key = layerId==='temp'?'tempFrames':'rainFrames';
+    if(this.tex[key]) return;
+    const gibs = layerId==='temp'?'MODIS_Terra_Land_Surface_Temp_Day':'IMERG_Precipitation_Rate';
+    const THREE=window.THREE; const TL=new THREE.TextureLoader(); TL.setCrossOrigin('anonymous');
+    const baseUrl='https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&CRS=EPSG:4326&BBOX=-90,-180,90,180';
+    const N=this.FRAMES; this.tex[key]=new Array(N).fill(null);
+    for(let k=0;k<N;k++){
+      const day=new Date(Date.now()-(2+(N-1-k))*86400000).toISOString().slice(0,10);
+      const url=`${baseUrl}&LAYERS=${gibs}&WIDTH=1024&HEIGHT=512&FORMAT=image/png&TRANSPARENT=true&TIME=${day}`;
+      ((idx)=>{ TL.load(url, t=>{ t.colorSpace=THREE.SRGBColorSpace; this.tex[key][idx]=t; if(this.activeDataLayer()===layerId) this.buildDataTexture(); }, undefined, ()=>{}); })(k);
+    }
+  }
+  // sync data overlay + scrubber/label when the integer frame changes
+  syncFrameLayers(fr){ this.buildDataTexture(); if(this.state.frame!==fr) this.setState({frame:fr}); }
+  // timestamp for frame f, based on the selected period/frequency preset
+  frameStamp(f){
+    const n=this.periodFrames(), step=this.periodMeta().step;
+    const d=new Date(Date.now() - (n-1-(f%n))*step*60000);
+    return d;
+  }
+
+  // point the data-overlay shell at the REAL GIBS field for the active layer + current time frame
+  buildDataTexture(){
+    const T=this.three; if(!T) return;
+    const dl=this.activeDataLayer(); const tex=this.tex||{};
+    const fr=this._curF||0;
+    let map=null;
+    if(dl==='temp') map=(tex.tempFrames&&tex.tempFrames[fr])||tex.tempReal||null;
+    else if(dl==='rain') map=(tex.rainFrames&&tex.rainFrames[fr])||tex.rainReal||null;
+    T.dataMat.map=map; T.dataMat.needsUpdate=true;
+  }
+
+  activeDataLayer(){ const a=this.state.activeLayers; return a.temp?'temp':(a.rain?'rain':null); }
+
+  // sync three materials/visibility to active layers
+  applyLayers(){
+    const T=this.three; if(!T||!window.THREE) return; const a=this.state.activeLayers, tex=this.tex||{};
+    // base earth (unlit): real cloud-free NASA Blue Marble (animated clouds live on their own shell)
+    const dayTex = tex.dayReal || tex.day;
+    if(a.satellite && dayTex){ T.mat.map=dayTex; T.mat.color.setHex(0xffffff); }
+    else { T.mat.map=null; T.mat.color.setHex(0x16324a); }
+    T.mat.needsUpdate=true;
+    // real animated cloud-imagery frames are handled per-frame in tick (frameShell)
+    const op=(this.state.opacity==null?100:this.state.opacity)/100;
+    if(this.cloudFrame){ this.cloudFrame.mat.uniforms.uOn.value=a.clouds?1:0; this.cloudFrame.mat.uniforms.uOp.value=op; }
+    // borders
+    T.bordMat.opacity = a.borders?0.9:0; T.bordMat.needsUpdate=true;
+    // data overlay (temp/rain) — REAL NASA GIBS fields (MODIS LST / GPM IMERG)
+    this.buildDataTexture();
+    const dl=this.activeDataLayer();
+    const fr=this._curF||0;
+    const hasReal = dl==='temp' ? !!((tex.tempFrames&&tex.tempFrames[fr])||tex.tempReal) : dl==='rain' ? !!((tex.rainFrames&&tex.rainFrames[fr])||tex.rainReal) : false;
+    T.dataMat.opacity = hasReal ? 0.86*op : 0; T.dataMat.needsUpdate=true;
+    // terminator + night handled per-frame in tick via uniforms
+    this.renderOnce();
+  }
+
+  // paint a frame immediately (so texture/layer changes show even if rAF is throttled)
+  renderOnce(){ const T=this.three; if(T&&T.renderer) T.renderer.render(T.scene,T.camera); }
+
+  initSat(){
+    const d3=window.d3, canvas=this.satRef.current; if(!canvas) return;
+    const ctx=canvas.getContext('2d'); let w=0,h=0,dpr=Math.min(window.devicePixelRatio||1,2);
+    const resize=()=>{ const cw=canvas.clientWidth||canvas.parentNode&&canvas.parentNode.clientWidth||0, ch=canvas.clientHeight||canvas.parentNode&&canvas.parentNode.clientHeight||0;
+      if(cw<=0||ch<=0) return false; w=cw; h=ch; canvas.width=w*dpr; canvas.height=h*dpr; ctx.setTransform(dpr,0,0,dpr,0,0); return true; };
+    resize();
+    // observe the PARENT (sized box) so the buffer resizes when the panel enters layout
+    this.sro=new ResizeObserver(()=>resize()); this.sro.observe(canvas.parentNode||canvas);
+    // mini panel mirrors the REAL active GIBS field (temp/rain) or the true-color base
+    const render=()=>{
+      // if buffer is still 0 (panel was off-screen at init), size it now that it has layout
+      if((canvas.width===0||w===0) && (canvas.clientWidth>0)) resize();
+      if(w<=0||h<=0) return;
+      const dl=this.activeDataLayer();
+      const tex=this.tex||{};
+      const img = dl==='temp' ? (tex.tempReal&&tex.tempReal.image) : dl==='rain' ? (tex.rainReal&&tex.rainReal.image) : (tex.dayReal&&tex.dayReal.image);
+      ctx.clearRect(0,0,w,h);
+      ctx.fillStyle='#06140f'; ctx.fillRect(0,0,w,h);
+      if(img){ try{ ctx.drawImage(img,0,0,w,h); }catch(e){} }
+      else { ctx.fillStyle='#0c2a20'; ctx.font="12px 'IBM Plex Mono', monospace"; ctx.fillText('carregando…', 12, 22); }
+    };
+    render();
+    this.satTimer=d3.timer(()=>render());
+  }
+
+  /* ---------------- actions ---------------- */
+  toggleLayer(id){
+    const a=Object.assign({}, this.state.activeLayers); a[id]=!a[id];
+    this.setState({activeLayers:a}, ()=>{ this.applyLayers(); if(a[id]&&(id==='temp'||id==='rain')) this.loadLayerFrames(id); if(a[id]&&id==='wind') this.maybeFetchWindGrid(); });
+  }
+  setSev(s){ this.setState({sev:s}); }
+  openAlert(al){ this.setState({selectedAlert:al}); if(this.flyTo){ if(!this.state.activeLayers.alerts){ this.toggleLayer('alerts'); } this.flyTo(al.lng,al.lat); } }
+  closeAlert(){ this.setState({selectedAlert:null}); }
+  setNowcastCity(city){ const r=this.REGIONS.find(x=>x.city===city); if(r){ this.pickGeo({label:r.city+', '+(this.state.lang==='pt'?r.zonePt:r.zoneEn), lat:r.lat, lng:r.lng}); } }
+  onNowcastQuery(e){ const q=e.target.value; this.setState({nowcastQuery:q}); clearTimeout(this._geoT); if(!q||q.trim().length<2){ this.setState({geoResults:[]}); return; } this._geoT=setTimeout(()=>this.searchGeo(q.trim()),350); }
+  async searchGeo(q){ try{ const lang=this.state.lang; const j=await this.fetchJson(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=6&language=${lang}&format=json`, 9000);
+    const results=(j.results||[]).map(r=>({ label:[r.name, r.admin1, r.country].filter(Boolean).join(', '), lat:r.latitude, lng:r.longitude })); this.setState({geoResults:results}); }catch(e){ this.setState({geoResults:[]}); } }
+  pickGeo(loc){
+    const nextLoc={label:loc.label, lat:loc.lat, lng:loc.lng};
+    this.setState({nowcastQuery:'', geoResults:[], timelineHour:0, dayForecast:null});
+    this.patchLive({ nowcastLoc:nextLoc, nowcast:null, indices:null }, ()=>{
+      this.fetchNowcast(nextLoc);
+      if(this.state.forecastDate) this.queryDate(this.state.forecastDate, nextLoc);
+    });
+    if(this.flyTo) this.flyTo(loc.lng, loc.lat);
+  }
+  onForecastDate(e){ const d=e.target.value; this.setState({forecastDate:d}); if(d) this.queryDate(d); else this.setState({dayForecast:null}); }
+  async queryDate(date, locOverride){
+    const loc=locOverride||(this.state.live&&this.state.live.nowcastLoc); if(!loc||!date) return;
+    this._dayCache=this._dayCache||{};
+    const cacheKey=[date, Number(loc.lat).toFixed(3), Number(loc.lng).toFixed(3)].join('|');
+    if(this._dayCache[cacheKey]){ this.setState({dayLoading:false, dayForecast:this._dayCache[cacheKey]}); return; }
+    this._dayRequestKey=cacheKey;
+    this.setState({dayLoading:true, dayForecast:null});
+    const today=new Date().toISOString().slice(0,10);
+    const daysAhead=Math.round((new Date(date+'T00:00:00Z')-new Date(today+'T00:00:00Z'))/86400000);
+    const past = daysAhead < 0;
+    if(!past && daysAhead>15){
+      this.setState({ dayLoading:false, dayForecast:{ date, ok:false, reason:'outside_range' } });
+      return;
+    }
+    const host = past ? 'https://archive-api.open-meteo.com/v1/archive' : 'https://api.open-meteo.com/v1/forecast';
+    const daily='weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_hours,wind_speed_10m_max,wind_gusts_10m_max,uv_index_max,sunrise,sunset';
+    const query = past ? `start_date=${date}&end_date=${date}` : `forecast_days=${Math.max(1, Math.min(16, daysAhead+1))}`;
+    try{
+      const j=await this.fetchJson(`${host}?latitude=${loc.lat}&longitude=${loc.lng}&daily=${daily}&${query}&wind_speed_unit=ms&timezone=auto`, 11000);
+      if(this._dayRequestKey!==cacheKey) return;
+      const D=j.daily;
+      const idx=(D&&D.time)?D.time.indexOf(date):-1;
+      if(D && D.time && idx>=0){
+        const code=D.weather_code&&D.weather_code[idx]!=null?D.weather_code[idx]:0;
+        const w=this.wmo(code);
+        const forecast={ date, ok:true, label:loc.label, code, icon:w[0], condPt:w[1], condEn:w[2],
+          tmax:D.temperature_2m_max[idx], tmin:D.temperature_2m_min[idx], precip:D.precipitation_sum[idx], precipHours:D.precipitation_hours?D.precipitation_hours[idx]:null,
+          wind:D.wind_speed_10m_max[idx], gust:D.wind_gusts_10m_max?D.wind_gusts_10m_max[idx]:null, uv:D.uv_index_max?D.uv_index_max[idx]:null,
+          sunrise:D.sunrise?D.sunrise[idx]:null, sunset:D.sunset?D.sunset[idx]:null, past };
+        this._dayCache[cacheKey]=forecast;
+        this.setState({ dayLoading:false, dayForecast:forecast });
+      } else { this.setState({ dayLoading:false, dayForecast:{ date, ok:false, reason:'empty' } }); }
+    }catch(e){
+      if(this._dayRequestKey!==cacheKey) return;
+      const msg=(e&&e.message)||String(e||'');
+      this.setState({ dayLoading:false, dayForecast:{ date, ok:false, reason:msg.indexOf('429')>=0?'rate_limit':'error' } });
+    }
+  }
+  onTimeline(e){ this.setState({timelineHour:+e.target.value}, ()=>this.buildDataTexture()); }
+  togglePlay(){ this.setState({playing:!this.state.playing}); }
+  setWindDensity(d){ this.setState({windDensity:d}); }
+  setPeriod(p){ this.setState({period:p, frame:this.periodFrames()-1}); }
+  setResolution(r){ this.setState({resolution:r}); }
+  onOpacity(e){ this.setState({opacity:+e.target.value}, ()=>this.applyLayers()); }
+  onFrame(e){ const v=+e.target.value; this.setState({frame:v, playing:false}, ()=>{ this._curF=((v%this.FRAMES)+this.FRAMES)%this.FRAMES; if(this.cloudFrame) this.cloudFrame.phase=this._curF; this.buildDataTexture(); }); }
+  stepFrame(d){ const v=Math.max(0,Math.min(this.FRAMES-1,this.state.frame+d)); this.setState({frame:v, playing:false}, ()=>{ this._curF=v; if(this.cloudFrame) this.cloudFrame.phase=v; this.buildDataTexture(); }); }
+  focusAlert(al){ this.openAlert(al); }
+  zoomIn(){ if(this.applyZoom)this.applyZoom(1.18); }
+  zoomOut(){ if(this.applyZoom)this.applyZoom(0.85); }
+  resetGlobe(){ if(this.resetView) this.resetView(); }
+
+  /* ---------------- render values ---------------- */
+  renderVals(){
+    const L=this.state.lang, ui=this.T[L], d3=window.d3;
+    const aL=this.state.activeLayers;
+    const dataLayer=aL.temp?'temp':(aL.rain?'rain':null);
+    const layerCfg=dataLayer?this.LAYERS.find(l=>l.id===dataLayer):null;
+    const live=this.state.live||{};
+    const overview=live.climwebOverview||null;
+    const climwebModules=(overview&&overview.modules)||[];
+    const stateCounts=(overview&&overview.states)||{};
+    const forecastRows=this.forecastRows();
+    const rasterRows=(live.climwebRasters&&Array.isArray(live.climwebRasters))?live.climwebRasters:[];
+    const stationRows=this.stationSet();
+    const capRows=this.capAlertSet();
+
+    // nav (real in-page anchors)
+    const nav = L==='pt'?[['Mapa','globo'],['Alertas','alertas'],['Previsão','previsao'],['Serviços','dados']]:[['Map','globo'],['Alerts','alertas'],['Forecast','previsao'],['Services','dados']];
+    const navItems=nav.map(p=>({label:p[0], href:'#'+p[1]}));
+
+    // lang buttons
+    const lb=(on)=>`padding:7px 13px;border:none;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;${on?'background:#0f2922;color:#fff':'background:#fff;color:#7e9a8f'}`;
+
+    // layers (toggle on/off, stackable)
+    const layersView=this.LAYERS.map(l=>{
+      const active=!!aL[l.id];
+      return {
+        name: L==='pt'?l.pt:l.en, swatch: active?l.swatch:'#c2d2cb',
+        onClick:()=>this.toggleLayer(l.id),
+        style:`display:inline-flex;align-items:center;gap:8px;padding:9px 13px;border-radius:11px;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;font-size:13px;font-weight:${active?600:500};transition:all .15s;${active?'background:#0f2922;color:#fff;border:1px solid #0f2922;box-shadow:0 8px 18px -10px rgba(15,41,34,.6)':'background:#fff;color:#7e9a8f;border:1px solid #dde7e2'}`
+      };
+    });
+
+    // legend reflects active data layer (temp/rain) or satellite imagery
+    let legendGradient='linear-gradient(90deg,#1b3a52,#2f6f8f,#4fd6c0)';
+    if(d3 && dataLayer){ const interp=this.layerInterp(dataLayer); const stops=[]; for(let i=0;i<=8;i++){ stops.push(interp(i/8)+' '+(i/8*100)+'%'); } legendGradient='linear-gradient(90deg,'+stops.join(',')+')'; }
+
+    // ---- time-dimension player: real NASA daily frames (all layers move with this clock) ----
+    const NF=this.FRAMES;
+    const dates=this.gibsFrames||[];
+    const fr=((this.state.frame%NF)+NF)%NF;
+    const dstr=dates[fr]; // 'YYYY-MM-DD'
+    const officialFrame=(dataLayer&&this.climwebRasterFrames&&this.climwebRasterFrames[dataLayer])?this.climwebRasterFrames[dataLayer][fr]:null;
+    const frameDates=(this.gibsFrames||[]).filter(Boolean);
+    const latestGibs=frameDates.length?frameDates[frameDates.length-1]:this.gibsDate;
+    const gibsRange=frameDates.length>1 ? (frameDates[0]+' -> '+latestGibs) : (latestGibs||'—');
+    const liveStamp = officialFrame ? this.fmtDateShort(officialFrame) : (dstr ? (dstr.slice(8,10)+'/'+dstr.slice(5,7)+'/'+dstr.slice(0,4)) : '—');
+    const liveDate = officialFrame ? (L==='pt'?'ClimWeb GeoManager · raster oficial':'ClimWeb GeoManager · official raster') : (L==='pt'?'NASA GIBS · imagem diária':'NASA GIBS · daily imagery');
+    const liveSourceLine = officialFrame ? liveDate : (liveDate+' · '+(L==='pt'?'latencia normal ~48h':'normal latency ~48h'));
+    const isLatest=fr===NF-1;
+    const playerFrames=NF-1;
+    const playerVal=fr;
+    // period/frequency presets + resolution + opacity
+    const periodView=Object.keys(this.PERIODS).map(p=>({ label:p, onClick:()=>this.setPeriod(p),
+      style:`padding:5px 9px;border-radius:7px;cursor:pointer;font-size:10.5px;font-weight:600;font-family:'IBM Plex Mono',monospace;white-space:nowrap;transition:all .15s;${this.state.period===p?'background:#34d399;color:#052017;border:1px solid #34d399':'background:#ffffff10;color:#bfe9d8;border:1px solid #ffffff22'}`
+    }));
+    const resView=this.RESOLUTIONS.map(r=>({ label:r, onClick:()=>this.setResolution(r),
+      style:`padding:5px 9px;border-radius:7px;cursor:pointer;font-size:10.5px;font-weight:600;font-family:'IBM Plex Mono',monospace;white-space:nowrap;transition:all .15s;${this.state.resolution===r?'background:#22d3ee;color:#042a30;border:1px solid #22d3ee':'background:#ffffff10;color:#bfe9d8;border:1px solid #ffffff22'}`
+    }));
+    const opacity=this.state.opacity==null?100:this.state.opacity;
+    const stepLabel=this.periodMeta().step>=60?(this.periodMeta().step/60)+'h':this.periodMeta().step+'min';
+    // wind density buttons
+    const wdDefs=[['baixa',L==='pt'?'Baixa':'Low'],['media',L==='pt'?'Média':'Med'],['alta',L==='pt'?'Alta':'High'],['muito',L==='pt'?'Muito alta':'Very high']];
+    const windDensView=wdDefs.map(([id,label])=>{ const on=this.state.windDensity===id; return {
+      label, onClick:()=>this.setWindDensity(id),
+      style:`padding:5px 10px;border-radius:8px;cursor:pointer;font-size:11px;font-weight:600;font-family:'IBM Plex Mono',monospace;transition:all .15s;${on?'background:#5eead4;color:#063b32;border:1px solid #5eead4':'background:#ffffff14;color:#bfe9d8;border:1px solid #ffffff26'}`
+    };});
+    const windOn=this.state.activeLayers.wind;
+
+    // alerts (official CAP first, then labeled external feeds; no synthetic fallback)
+    const ALL=this.alertSet();
+    const filtered=ALL.filter(a=>this.state.sev==='all'||a.sev===this.state.sev);
+    const alertsView=filtered.map(a=>{ const m=this.sevMeta(a.sev)||this.sevMeta('moderate'); return {
+      icon:a.icon, color:m.c, tint:m.t, sevLabel:(L==='pt'?m.pt:m.en),
+      ago:this.fmtAgo(a.mins,L), headline:L==='pt'?a.pt:a.en, region:L==='pt'?a.region:a.regionEn, area:a.area,
+      onClick:()=>this.focusAlert(a)
+    };});
+    const top=ALL[0]||null; const tm=top?(this.sevMeta(top.sev)||this.sevMeta('moderate')):this.sevMeta('minor');
+    const topAlert=top?{headline:L==='pt'?top.pt:top.en, color:tm.c, sevLabel:L==='pt'?tm.pt:tm.en, region:L==='pt'?top.region:top.regionEn}:{headline:L==='pt'?'Nenhum alerta ativo recebido':'No active alert received', color:'#16a34a', sevLabel:L==='pt'?'Operacional':'Operational', region:'ClimWeb CAP / GDACS / USGS'};
+
+    // selected-alert detail (modal)
+    const sa=this.state.selectedAlert; let alertDetail=null;
+    if(sa){ const m=this.sevMeta(sa.sev)||this.sevMeta('moderate'); const R=[]; const add=(k,v)=>R.push({k,v});
+      add(L==='pt'?'Tipo':'Type', (sa.typeLabel?(L==='pt'?sa.typeLabel[0]:sa.typeLabel[1]):sa.area));
+      if(sa.mag!=null) add(L==='pt'?'Magnitude':'Magnitude','M '+sa.mag.toFixed(1));
+      if(sa.depth!=null) add(L==='pt'?'Profundidade':'Depth', sa.depth+' km');
+      if(sa.severityText) add(L==='pt'?'Severidade':'Severity', sa.severityText);
+      if(sa.alertLevel) add(L==='pt'?'Nível GDACS':'GDACS level', sa.alertLevel);
+      if(sa.country) add(L==='pt'?'País':'Country', sa.country);
+      if(sa.felt!=null) add(L==='pt'?'Relatos sentidos':'Felt reports', String(sa.felt));
+      if(sa.tsunami) add('Tsunami', L==='pt'?'Alerta emitido':'Alert issued');
+      add(L==='pt'?'Coordenadas':'Coordinates', sa.lat.toFixed(2)+'°, '+sa.lng.toFixed(2)+'°');
+      add(L==='pt'?'Detectado':'Detected', this.fmtAgo(sa.mins,L));
+      add(L==='pt'?'Fonte':'Source', sa.src);
+      alertDetail={ icon:sa.icon, color:m.c, tint:m.t, sevLabel:(L==='pt'?m.pt:m.en),
+        headline:L==='pt'?sa.pt:sa.en, region:L==='pt'?sa.region:sa.regionEn, rows:R, url:sa.url||null,
+        urlLabel:(L==='pt'?'Ver boletim oficial ('+sa.src+')':'Open official bulletin ('+sa.src+')') };
+    }
+    // nowcast location search (free city/state/country via Open-Meteo geocoding)
+    const nowcastCity=(this.state.live.nowcastLoc&&this.state.live.nowcastLoc.label)||'—';
+    const nowcastQuery=this.state.nowcastQuery||'';
+    const geoResults=(this.state.geoResults||[]).map(r=>({ label:r.label, onClick:()=>this.pickGeo(r) }));
+    const onNowcastQuery=(e)=>this.onNowcastQuery(e);
+    const quickSource=forecastRows.length?forecastRows.slice(0,6):this.REGIONS.slice(0,6);
+    const quickCities=quickSource.map(r=>{
+      const name=r.name||r.city, lat=r.lat, lng=(r.lon!=null?r.lon:r.lng);
+      const zone=(r.zonePt||r.zoneEn||'ClimWeb');
+      return { label:name, onClick:()=>this.pickGeo({label:name+', '+zone, lat, lng}), selected: nowcastCity.indexOf(name)===0 };
+    });
+    // specific-date forecast/archive
+    const forecastDate=this.state.forecastDate||'';
+    const onForecastDate=(e)=>this.onForecastDate(e);
+    const maxDate=new Date(Date.now()+15*86400000).toISOString().slice(0,10);
+    const minDate='1980-01-01';
+    const df=this.state.dayForecast; let dayCard=null;
+    if(this.state.dayLoading) dayCard={loading:true};
+    else if(df){
+      if(df.ok){ const fmt=(iso)=>iso?iso.slice(11,16):'—'; const dd=df.date.slice(8,10)+'/'+df.date.slice(5,7)+'/'+df.date.slice(0,4);
+        dayCard={ ok:true, loading:false, icon:df.icon, cond:(L==='pt'?df.condPt:df.condEn), dateLabel:dd, place:df.label,
+          tag:(df.past?(L==='pt'?'Observado':'Observed'):(L==='pt'?'Previsto':'Forecast')),
+          rows:[
+            {k:(L==='pt'?'Temp. máx / mín':'Temp max / min'), v:Math.round(df.tmax)+'° / '+Math.round(df.tmin)+'°'},
+            {k:(L==='pt'?'Chuva':'Precipitation'), v:(df.precip!=null?df.precip.toFixed(1):'0')+' mm'+(df.precipHours!=null?(' · '+Math.round(df.precipHours)+'h'):'')},
+            {k:(L==='pt'?'Vento máx':'Max wind'), v:Math.round(df.wind)+' m/s'+(df.gust!=null?(' · '+(L==='pt'?'raj.':'gust')+' '+Math.round(df.gust)):'')},
+            {k:'UV máx', v:df.uv!=null?Math.round(df.uv):'—'},
+            {k:(L==='pt'?'Nascer / pôr do sol':'Sunrise / sunset'), v:fmt(df.sunrise)+' / '+fmt(df.sunset)}
+          ] };
+      } else {
+        const dd=df.date.slice(8,10)+'/'+df.date.slice(5,7)+'/'+df.date.slice(0,4);
+        const msg=df.reason==='rate_limit' ? ui.dateRateLimit : df.reason==='outside_range' ? ui.dateOutOfRange : df.reason==='error' ? ui.dateSourceError : (ui.dateNoData+' ('+dd+')');
+        dayCard={ ok:false, loading:false, dateLabel:dd, message:msg };
+      }
+    }
+
+    // severity chips
+    const counts={all:ALL.length,extreme:0,severe:0,moderate:0,minor:0};
+    ALL.forEach(a=>{ if(counts[a.sev]!=null) counts[a.sev]++; });
+    const chipDef=[['all',L==='pt'?'Todos':'All','#0f2922'],['extreme',this.sevMeta('extreme')[L],'#dc2626'],['severe',this.sevMeta('severe')[L],'#f97316'],['moderate',this.sevMeta('moderate')[L],'#f59e0b'],['minor',this.sevMeta('minor')[L],'#16a34a']];
+    const sevChips=chipDef.map(([id,label,c])=>{ const on=this.state.sev===id; return {
+      label:label+' ', count:counts[id], onClick:()=>this.setSev(id),
+      style:`display:inline-flex;align-items:center;gap:5px;padding:6px 11px;border-radius:9px;cursor:pointer;font-size:11.5px;font-weight:600;transition:all .15s;${on?`background:${c};color:#fff;border:1px solid ${c}`:'background:#f4f8f6;color:#5b7a70;border:1px solid #e3ece8'}`
+    };});
+
+    // nowcast (12h) — REAL hourly from Open-Meteo when loaded
+    const LN=this.state.live&&this.state.live.nowcast;
+    const hr=this.state.timelineHour;
+    const condsPt=['Limpo','Sol','Parcial','Nublado','Chuva','Tempestade','Pancadas'];
+    const condsEn=['Clear','Sunny','Partly','Cloudy','Rain','Storm','Showers'];
+    const nowLabel=(h)=>{ const d=new Date(); d.setHours(d.getHours()+h); return (h===0?(L==='pt'?'Agora':'Now'):('+'+h+'h'))+' · '+String(d.getHours()).padStart(2,'0')+'h'; };
+    let nc, nowcastBars;
+    if(LN && LN.hours && LN.hours.length){
+      const H=LN.hours; const cur=H[Math.min(hr,H.length-1)];
+      const w=this.wmo(0); // condition text from current at hr handled below
+      nc={ temp:cur.t, pop:cur.pop, wind:LN.wind, icon:cur.icon,
+        cond: (hr===0? (L==='pt'?LN.condPt:LN.condEn) : (L==='pt'?'Previsto':'Forecast')), label:nowLabel(hr) };
+      const ts=H.map(x=>x.t); const tmin=Math.min(...ts), tmax=Math.max(...ts);
+      nowcastBars=H.map((x,h)=>{ const th=tmax>tmin?(x.t-tmin)/(tmax-tmin):0.5; const on=h===hr;
+        return { popH:x.pop, onClick:()=>this.setState({timelineHour:h}),
+          tempDot:`height:${4+th*22}px;margin-top:2px;border-radius:4px;background:${on?'#f97316':'#fdba74'};${on?'box-shadow:0 0 0 2px #fed7aa':''}` }; });
+    } else {
+      const err=this.state.live&&this.state.live.nowcastError;
+      const cond=err==='rate_limit'?ui.nowcastRateLimit:(err?ui.nowcastError:(L==='pt'?'Aguardando fonte real':'Waiting for real source'));
+      nc={ temp:'—', pop:'—', wind:'—', icon:'⌛', cond, label:'—' };
+      nowcastBars=Array.from({length:12},(_,h)=>({ popH:0, onClick:()=>this.setState({timelineHour:h}), tempDot:'height:4px;margin-top:2px;border-radius:4px;background:#cfdcd6' }));
+    }
+    const ncPop=nc.pop, ncWind=nc.wind;
+
+    // satellite meta: never call delayed NASA frames "live"; show the publication window.
+    const satSource = officialFrame ? 'ClimWeb GeoManager' : (dataLayer==='rain'?'NASA GIBS / GPM IMERG':(dataLayer==='temp'?'NASA GIBS / MODIS LST':'NASA GIBS / MODIS RGB'));
+    const satFrameValue = officialFrame ? this.fmtDateShort(officialFrame) : (latestGibs||'—');
+    const satLatencyValue = officialFrame ? (L==='pt'?'local/oficial':'local/official') : ui.satLatencyValue;
+    const satStatus = officialFrame ? ui.satStatusOfficial : ui.satStatusGibs;
+    const satRange = officialFrame ? (L==='pt'?'Frame do raster oficial':'Official raster frame') : ((L==='pt'?'Janela publicada: ':'Published window: ')+gibsRange);
+    const satCardKicker = officialFrame ? 'ClimWeb GeoManager' : 'NASA GIBS';
+    const satLabel = dataLayer
+      ? (officialFrame ? ('ClimWeb GeoManager · '+(L==='pt'?layerCfg.pt:layerCfg.en)+' · '+this.fmtDateShort(officialFrame)) : (satSource+' · '+(L==='pt'?layerCfg.pt:layerCfg.en)))
+      : (frameDates.length>1 ? ('MODIS true-color '+(L==='pt'?'(animado)':'(animated)')+' · '+gibsRange) : 'NASA Blue Marble');
+    const satMeta=[
+      {label:ui.source, value:satSource},
+      {label:ui.satFrame, value:satFrameValue},
+      {label:ui.satLatency, value:satLatencyValue}
+    ];
+
+    // trends 14d — REAL daily max temp + REAL daily precipitation totals (Open-Meteo)
+    const N=14, pw=320/N;
+    const precipBars=[]; const tempPts=[];
+    const LT=this.state.live&&this.state.live.trends;
+    const realT = LT&&LT.tempHi&&LT.tempHi.length>=10 ? LT.tempHi.slice(-N) : null;
+    const realP = LT&&LT.precip&&LT.precip.length>=10 ? LT.precip.slice(-N) : null;
+    const realTimes = LT&&LT.times&&LT.times.length>=10 ? LT.times.slice(-N) : [];
+    const hasTrendData=!!(realT&&realT.length);
+    const tvals=[]; for(let i=0;i<N;i++){ tvals.push(hasTrendData?(realT[i]||0):0); }
+    const tmin=Math.min(...tvals)-2, tmax=Math.max(...tvals)+2;
+    const pmax = realP ? Math.max(8, Math.max(...realP)) : 1;
+    for(let i=0;i<N;i++){
+      const pr = realP ? realP[i] : 0;
+      const ph=Math.max(0, pr/pmax*60); precipBars.push({x:(i*pw+3).toFixed(1),y:(140-ph).toFixed(1),w:(pw-6).toFixed(1),h:ph.toFixed(1)});
+      const ty=120-((tvals[i]-tmin)/((tmax-tmin)||1))*110;
+      tempPts.push([i*pw+pw/2, ty]);
+    }
+    const tempLine='M'+tempPts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join('L');
+    const tempArea=tempLine+`L${(N-1)*pw+pw/2},150 L${pw/2},150 Z`;
+    const tempDots=tempPts.map(p=>({x:p[0].toFixed(1),y:p[1].toFixed(1)}));
+    this._trendCanvasData={ precipBars, tempPts, hasTrendData };
+    // ---- interactive hover columns: each carries date + real values + tooltip geometry ----
+    const monPt=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+    const monEn=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const fmtTrendDay=(iso)=>{
+      const dt=new Date(iso); if(Number.isNaN(dt.getTime())) return String(iso||'—');
+      return String(dt.getUTCDate()).padStart(2,'0')+' '+(L==='pt'?monPt:monEn)[dt.getUTCMonth()];
+    };
+    const trendRange = realTimes.length ? (fmtTrendDay(realTimes[0])+' -> '+fmtTrendDay(realTimes[realTimes.length-1])) : ui.last14;
+    const trendStatus = hasTrendData ? (ui.trendSource+' · '+trendRange) : ui.trendPending;
+    const trendLegendNote = hasTrendData ? ui.trendLegendNote : (L==='pt'?'Sem serie suficiente da fonte real.':'No sufficient real source series.');
+    const hov=this.state.trendHover;
+    const trendCols=[];
+    for(let i=0;i<N;i++){
+      const dtIso=realTimes[i]||new Date(Date.now()-(N-1-i)*86400000).toISOString().slice(0,10);
+      const dlabel=fmtTrendDay(dtIso);
+      const pr = realP ? realP[i] : 0;
+      const cx=i*pw+pw/2;
+      const ttW=104; let ttX=cx-ttW/2; if(ttX<2)ttX=2; if(ttX+ttW>318)ttX=318-ttW;
+      const cxPct=(cx/320*100).toFixed(3);
+      const dotPct=(tempPts[i][1]/150*100).toFixed(3);
+      const ttXPct=(ttX/320*100).toFixed(3);
+      const ttYPct=((tempPts[i][1]<54?70:6)/150*100).toFixed(3);
+      trendCols.push({ i, x:(i*pw).toFixed(1), w:pw.toFixed(1), cx:cx.toFixed(1),
+        dotY:tempPts[i][1].toFixed(1), active:hov===i,
+        onEnter:()=>{ if(this.state.trendHover!==i) this.setState({trendHover:i}); },
+        date:dlabel, temp:hasTrendData?(Math.round(tvals[i])+'°'):'—', precip:realP?((pr!=null?pr.toFixed(pr<10?1:0):'0')+' mm'):'—',
+        ttX:ttX.toFixed(1), ttY:(tempPts[i][1]<54?70:6).toFixed(1),
+        hitStyle:`position:absolute;left:${(i/N*100).toFixed(3)}%;top:0;width:${(100/N).toFixed(3)}%;height:100%;cursor:crosshair;z-index:3`,
+        lineStyle:`position:absolute;left:${cxPct}%;top:6px;bottom:10px;border-left:1px dashed rgba(249,115,22,.58);z-index:4;pointer-events:none`,
+        dotStyle:`position:absolute;left:${cxPct}%;top:${dotPct}%;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border-radius:50%;background:#f97316;border:2px solid #fff;box-shadow:0 4px 10px rgba(6,26,20,.22);z-index:5;pointer-events:none`,
+        tipStyle:`position:absolute;left:${ttXPct}%;top:${ttYPct}%;width:104px;padding:9px 10px;border-radius:9px;background:#0f2922;box-shadow:0 16px 30px -18px #000;z-index:6;pointer-events:none`
+      });
+    }
+    const trendHoverCol = hov!=null ? trendCols[hov] : null;
+    const onTrendLeave=()=>{ if(this.state.trendHover!=null) this.setState({trendHover:null}); };
+
+    // regions — official ForecastManager first; Open-Meteo complement second; empty otherwise
+    const regBg=['#fff7ed','#f0fdfa','#eff6ff','#fef2f2','#f5f3ff','#f0fdf4','#fffbeb','#ecfeff'];
+    const LR=this.state.live&&this.state.live.regions;
+    const regSrc = forecastRows.length ? forecastRows.slice(0,8) : (LR||[]);
+    const regionsView=regSrc.map((r,i)=>{ const base=this.REGIONS[i]||{};
+      const temp=(r.air_temperature!=null?r.air_temperature:r.temp);
+      const hi=(r.hi!=null?r.hi:null), lo=(r.lo!=null?r.lo:null);
+      const city=r.name||r.city||'—';
+      const cond=r.condition_label||(L==='pt'?(r.condPt||base.condPt):(r.condEn||base.condEn))||'—';
+      const windVal=(r.wind_speed!=null?r.wind_speed:r.wind);
+      return {
+        city, zone:forecastRows.length?'ForecastManager':(L==='pt'?(r.zonePt||base.zonePt):(r.zoneEn||base.zoneEn)), icon:r.icon||'🌐',
+        tempText:temp!=null?(Math.round(temp)+'°'):'—', hiText:hi!=null?(Math.round(hi)+'°'):'—', loText:lo!=null?(Math.round(lo)+'°'):'—',
+        cond,
+        trend: windVal!=null?('💨 '+Math.round(windVal)+' m/s'):(r.trend||''),
+        trendColor: '#5b7a70',
+        bg:regBg[i%regBg.length]
+      };});
+
+    // indices — REAL UV + air quality when loaded
+    const LI=this.state.live&&this.state.live.indices;
+    const uvV=LI? Math.max(0,Math.min(13,LI.uv)) : null;
+    const uvCat=uvV<3?[L==='pt'?'Baixo':'Low','#16a34a']:uvV<6?[L==='pt'?'Moderado':'Moderate','#f59e0b']:uvV<8?[L==='pt'?'Alto':'High','#f97316']:uvV<11?[L==='pt'?'Muito alto':'Very high','#dc2626']:[L==='pt'?'Extremo':'Extreme','#7c3aed'];
+    const uv={ value:uvV==null?'—':Math.round(uvV), label:uvV==null?(L==='pt'?'Pendente':'Pending'):uvCat[0], color:uvV==null?'#8aa399':uvCat[1], dash:`${uvV==null?0:(uvV/13)*251} 251`, advice:uvV==null?(L==='pt'?'Aguardando Open-Meteo Air Quality.':'Waiting for Open-Meteo Air Quality.'):L==='pt'?'Use protetor solar e evite o sol do meio-dia.':'Use sunscreen and avoid midday sun.' };
+
+    const aqiV=LI? Math.min(300,LI.aqi||0) : null;
+    const aqiCat=aqiV<50?[L==='pt'?'Boa':'Good','#16a34a']:aqiV<100?[L==='pt'?'Moderada':'Moderate','#f59e0b']:aqiV<150?[L==='pt'?'Insalubre p/ sensíveis':'Unhealthy (sensitive)','#f97316']:aqiV<200?[L==='pt'?'Insalubre':'Unhealthy','#dc2626']:[L==='pt'?'Muito insalubre':'Very unhealthy','#7c3aed'];
+    const aqi={ value:aqiV==null?'—':aqiV, label:aqiV==null?(L==='pt'?'Pendente':'Pending'):aqiCat[0], color:aqiV==null?'#8aa399':aqiCat[1], dash:`${aqiV==null?0:(aqiV/300)*251} 251`, pm:LI?LI.pm:'—' };
+
+    // wind dir + pressure — REAL when loaded
+    const dirsPt=['N','NE','L','SE','S','SO','O','NO']; const dirsEn=['N','NE','E','SE','S','SW','W','NW'];
+    const wdeg = LN? Math.round(LN.windDir) : null;
+    const di=Math.floor((wdeg%360)/45)%8; const windDir=(L==='pt'?dirsPt:dirsEn)[di]+' '+wdeg+'°';
+    const windDirLabel=wdeg==null?'—':windDir;
+    const gust = (LN&&LN.gust!=null)? LN.gust : '—';
+    const pressure = LN? LN.pressure : '—';
+    const realPT = LN&&LN.pressTrend&&LN.pressTrend.length>=2 ? LN.pressTrend : null;
+    const ppts=[]; const NPT=realPT?realPT.length:14;
+    for(let i=0;i<NPT;i++){ const v=realPT?realPT[i]:1010; ppts.push([i/(NPT-1)*220, 50-((v-985)/(1035-985))*40]); }
+    this._pressCanvasData=ppts;
+    const pressPath='M'+ppts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join('L');
+    const pressArea=pressPath+'L220,60 L0,60 Z';
+    const pd = (LN&&LN.pressDelta!=null)? LN.pressDelta : null;
+    const pressDeltaLabel = pd==null?'—':(pd>0?'↑ +':pd<0?'↓ ':'→ ')+pd.toFixed(1);
+    const pressDeltaColor = pd==null?'#8aa399':pd>0.3?'#16a34a':pd<-0.3?'#dc2626':'#8aa399';
+    const pressNoteDyn = pd==null ? (L==='pt'?'Aguardando leitura real de pressão.':'Waiting for real pressure reading.') : pd>0.5 ? (L==='pt'?'Pressão subindo — tempo estável/melhorando.':'Pressure rising — stable/improving.')
+      : pd<-0.5 ? (L==='pt'?'Pressão caindo — possível instabilidade.':'Pressure falling — possible instability.')
+      : (L==='pt'?'Pressão estável.':'Pressure steady.');
+
+    // datasets — real, browser-accessible sources actually used by this dashboard
+    const gibsLbl=(this.tex&&this.tex.dayReal)?'2048²':'—';
+    const geomanagerModule=this.moduleByKey('geomanager.catalog');
+    const forecastModule=this.moduleByKey('forecastmanager.forecasts');
+    const boundaryModule=this.moduleByKey('adminboundarymanager.boundaries');
+    const capModule=this.moduleByKey('cap.alerts');
+    const stationModule=this.moduleByKey('stations.oscar_wmo');
+    const datasets=[
+      {icon:'🌐', name:L==='pt'?'ClimWeb ForecastManager — cidades e previsões oficiais':'ClimWeb ForecastManager — official cities and forecasts', meta:'ClimWeb/WMO · JSON · ForecastManager', size:forecastModule&&forecastModule.count!=null?forecastModule.count:'—', updated:forecastModule?this.fmtDateShort(forecastModule.latest):'—', url:'/api/climasphere/forecast'},
+      {icon:'🗺️', name:L==='pt'?'ClimWeb GeoManager — rasters e catálogo':'ClimWeb GeoManager — rasters and catalog', meta:'GeoManager · RasterFileLayer · MapViewer', size:rasterRows.length||((geomanagerModule&&geomanagerModule.items&&geomanagerModule.items[1]&&geomanagerModule.items[1].value)||'—'), updated:rasterRows[0]?this.fmtDateShort(rasterRows[0].time):(geomanagerModule?this.fmtDateShort(geomanagerModule.latest):'—'), url:'/api/climasphere/rasters'},
+      {icon:'⚠️', name:L==='pt'?'ClimWeb CAP — alertas XML/RSS/GeoJSON':'ClimWeb CAP — XML/RSS/GeoJSON alerts', meta:'CAP Composer · CAP 1.2 · RSS', size:capModule&&capModule.count!=null?capModule.count:'—', updated:capModule?this.fmtDateShort(capModule.latest):'—', url:'/api/cap/rss.xml'},
+      {icon:'📍', name:L==='pt'?'ClimWeb Stations / OSCAR-WMO':'ClimWeb Stations / OSCAR-WMO', meta:'Stations JSON · MVT tiles', size:stationModule&&stationModule.count!=null?stationModule.count:'—', updated:stationRows.length?(L==='pt'?'tempo real':'live'):(stationModule?stationModule.state:'—'), url:'/api/stations'},
+      {icon:'▦', name:L==='pt'?'ClimWeb AdminBoundary — limites oficiais':'ClimWeb AdminBoundary — official boundaries', meta:'GeoJSON · MVT · admin-boundary', size:boundaryModule&&boundaryModule.count!=null?boundaryModule.count:'—', updated:boundaryModule?this.fmtDateShort(boundaryModule.latest):'—', url:'/api/climasphere/boundaries.geojson'},
+      {icon:'🌡️', name:L==='pt'?'Previsão Open-Meteo (T2m, vento, pressão)':'Open-Meteo forecast (T2m, wind, pressure)', meta:'GFS/ECMWF · API JSON · horária', size:'API', updated:L==='pt'?'tempo real':'live', url:'https://open-meteo.com/en/docs'},
+      {icon:'🛰️', name:L==='pt'?'NASA GIBS — MODIS true-color diário + Blue Marble':'NASA GIBS — daily MODIS true-color + Blue Marble', meta:'WMS · EPSG:4326 · diária', size:gibsLbl, updated:this.gibsDate||'—', url:'https://nasa-gibs.github.io/gibs-api-docs/'},
+      {icon:'⚠️', name:L==='pt'?'GDACS — alertas globais de desastres':'GDACS — global disaster alerts', meta:'GeoJSON · CAP · ao vivo', size:'API', updated:L==='pt'?'tempo real':'live', url:'https://www.gdacs.org/'},
+      {icon:'🌍', name:L==='pt'?'USGS — terremotos (M4.5+, 24h)':'USGS — earthquakes (M4.5+, 24h)', meta:'GeoJSON · ao vivo', size:'API', updated:L==='pt'?'tempo real':'live', url:'https://earthquake.usgs.gov/earthquakes/feed/'},
+      {icon:'💨', name:L==='pt'?'Open-Meteo Air Quality (AQI, PM2.5)':'Open-Meteo Air Quality (AQI, PM2.5)', meta:'CAMS · API JSON', size:'API', updated:L==='pt'?'tempo real':'live', url:'https://open-meteo.com/en/docs/air-quality-api'}
+    ];
+    const stateColor={ready:'#16a34a',empty:'#8aa399',pending_import:'#f59e0b',unconfigured:'#64748b',error:'#dc2626'};
+    const stateLabel=(s)=>s||'empty';
+    const groupOrder=['all','forecast','geospatial','alerts','observations','cms','public_interaction','platform'];
+    const groupLabelsPt={all:'Todos',forecast:'Previsao',geospatial:'Geo',alerts:'Alertas',observations:'Observacoes',cms:'CMS',public_interaction:'Interacao',platform:'Operacao'};
+    const groupLabelsEn={all:'All',forecast:'Forecast',geospatial:'Geo',alerts:'Alerts',observations:'Observations',cms:'CMS',public_interaction:'Interaction',platform:'Ops'};
+    const groupLabels=L==='pt'?groupLabelsPt:groupLabelsEn;
+    const groupCounts={all:climwebModules.length};
+    climwebModules.forEach(m=>{ groupCounts[m.group]=(groupCounts[m.group]||0)+1; });
+    const stateOrder=['all','ready','empty','pending_import','unconfigured','error'];
+    const stateCountsFull=Object.assign({all:climwebModules.length,ready:0,empty:0,pending_import:0,unconfigured:0,error:0},stateCounts);
+    const chipBase="border:1px solid #ffffff1a;border-radius:999px;padding:7px 10px;font-family:'IBM Plex Mono',monospace;font-size:10px;cursor:pointer;display:inline-flex;gap:6px;align-items:center;";
+    const chipStyle=(on,color)=>chipBase+(on?`background:${color};color:#061a14;border-color:${color};font-weight:700`:"background:#ffffff08;color:#a9ccc0");
+    const climwebGroupChips=groupOrder.filter(g=>g==='all'||groupCounts[g]).map(g=>({label:groupLabels[g]||g,count:groupCounts[g]||0,onClick:()=>this.setState({climwebGroup:g}),style:chipStyle(this.state.climwebGroup===g,'#34d399')}));
+    const climwebStateChips=stateOrder.filter(s=>s==='all'||stateCountsFull[s]).map(s=>({label:s==='all'?(L==='pt'?'Todos':'All'):s,count:stateCountsFull[s]||0,onClick:()=>this.setState({climwebState:s}),style:chipStyle(this.state.climwebState===s,stateColor[s]||'#34d399')}));
+    const filteredClimwebModules=climwebModules.filter(m=>(this.state.climwebGroup==='all'||m.group===this.state.climwebGroup)&&(this.state.climwebState==='all'||m.state===this.state.climwebState));
+    const selectedKey=this.state.selectedClimwebKey;
+    const selectedRaw=filteredClimwebModules.find(m=>m.key===selectedKey)||filteredClimwebModules[0]||climwebModules[0]||null;
+    const endpointRows=(m)=>Object.entries((m&&m.endpoints)||{}).filter(([k,v])=>v&&String(v).indexOf('<')<0&&String(v).indexOf('{')<0).map(([k,v])=>({label:k, value:v, shortUrl:String(v).replace(/^https?:\/\/[^/]+/,'').slice(0,46), onClick:()=>this.openUrl(v)}));
+    const moduleView=(m)=>{
+      const color=stateColor[m.state]||'#8aa399';
+      const count=(m.count===null||m.count===undefined)?'—':m.count;
+      const selected=selectedRaw&&selectedRaw.key===m.key;
+      const eps=endpointRows(m);
+      const itemRows=((m.items&&m.items.length)?m.items:[{label:'state',value:m.state},{label:'group',value:m.group}]).slice(0,5).map(it=>({label:it.label,value:it.value==null?'—':it.value}));
+      return {
+        raw:m, key:m.key, label:m.label, group:m.group, groupLabel:groupLabels[m.group]||m.group,
+        state:stateLabel(m.state), stateColor:color, count, source:m.source||'ClimWeb',
+        latest:this.fmtDateShort(m.latest), url:this.firstEndpoint(m), admin:m.admin_url||'',
+        selected, useCase:this.moduleUseCase(m), itemRows, endpointRows:eps,
+        previewUrl:(this.previewEndpoint(m)||'—').replace(/^https?:\/\/[^/]+/,'').slice(0,58),
+        metaRows:[
+          {label:ui.state,value:stateLabel(m.state)},
+          {label:ui.count,value:count},
+          {label:ui.latest,value:this.fmtDateShort(m.latest)},
+          {label:ui.source,value:m.source||'ClimWeb'}
+        ],
+        cardStyle:`width:100%;display:flex;flex-direction:column;gap:10px;min-height:150px;margin-bottom:9px;padding:13px;border-radius:14px;background:${selected?'#ffffff14':'#ffffff08'};border:1px solid ${selected?color:'#ffffff14'};text-align:left;cursor:pointer;box-shadow:${selected?('0 0 0 1px '+color+'55 inset'):'none'};`,
+        onSelect:()=>this.selectClimwebModule(m.key)
+      };
+    };
+    const climwebModulesView=filteredClimwebModules.map(moduleView);
+    const climwebSelected=selectedRaw?moduleView(selectedRaw):null;
+    const actionStyle=(primary)=>"border:1px solid "+(primary?'#34d399':'#ffffff20')+";background:"+(primary?'#34d399':'#ffffff0d')+";color:"+(primary?'#061a14':'#cdeee0')+";border-radius:10px;padding:8px 11px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:700;cursor:pointer;";
+    const climwebActions=(selectedRaw?this.climwebActionsFor(selectedRaw):[]).map(a=>Object.assign({},a,{style:actionStyle(a.tone==='primary'),hoverStyle:a.tone==='primary'?'filter:brightness(1.08)':'background:#ffffff18;border-color:#ffffff35'}));
+    const climwebResult=this.state.climwebActionResult?{headline:this.state.climwebActionResult.headline,rows:this.state.climwebActionResult.rows||[]}:null;
+    const climwebNoResult=!this.state.climwebActionLoading&&!this.state.climwebActionResult;
+    const climwebSummary=[
+      {label:'ready', value:stateCounts.ready||0, color:stateColor.ready},
+      {label:'empty', value:stateCounts.empty||0, color:stateColor.empty},
+      {label:'pending_import', value:stateCounts.pending_import||0, color:stateColor.pending_import},
+      {label:'unconfigured', value:stateCounts.unconfigured||0, color:stateColor.unconfigured},
+      {label:'error', value:stateCounts.error||0, color:stateColor.error}
+    ];
+    const moduleBy=(key)=>climwebModules.find(m=>m.key===key)||null;
+    const moduleCount=(m)=>(m&&m.count!==null&&m.count!==undefined)?m.count:'—';
+    const moduleLatest=(m)=>m?this.fmtDateShort(m.latest):'—';
+    const moduleState=(m)=>m?(m.state||'empty'):'pending_import';
+    const moduleColor=(m)=>stateColor[moduleState(m)]||stateColor.pending_import;
+    const compactUrl=(url)=>String(url||'—').replace(/^https?:\/\/[^/]+/,'').slice(0,42);
+    const opPrimary="border:1px solid #34d399;background:#34d399;color:#061a14;border-radius:9px;padding:7px 10px;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;cursor:pointer;";
+    const opSecondary="border:1px solid #ffffff20;background:#ffffff0d;color:#cdeee0;border-radius:9px;padding:7px 10px;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;cursor:pointer;";
+    const moduleCard=(key,icon,titlePt,titleEn,bodyPt,bodyEn,actionPt,actionEn)=>{
+      const m=moduleBy(key);
+      const api=m&&this.previewEndpoint(m);
+      return {
+        raw:m, key, icon, title:L==='pt'?titlePt:titleEn, body:L==='pt'?bodyPt:bodyEn,
+        source:(m&&m.source)||'ClimWeb/WMO', state:moduleState(m), stateColor:moduleColor(m),
+        count:moduleCount(m), latest:moduleLatest(m),
+        action:L==='pt'?actionPt:actionEn, secondary:L==='pt'?ui.test:'Test', hasTest:!!api,
+        primaryStyle:opPrimary, secondaryStyle:opSecondary,
+        onUse:()=>m?this.applyClimwebModule(m):this.fetchClimweb(),
+        onTest:()=>m&&this.runClimwebEndpoint(m)
+      };
+    };
+    const climwebOperationalCards=[
+      moduleCard('forecastmanager.forecasts','🌐','Previsao oficial por cidade','Official city forecast','Alimenta busca, agora, 12h e cidades oficiais do painel de previsao.','Feeds search, now, 12h and official cities in the forecast panel.',ui.openPanel,'Open panel'),
+      moduleCard('weather.weatherdetailpage','🌤️','Pagina publica de previsao','Public forecast page','Fluxo Wagtail de previsao operacional aberto a partir do dashboard.','Wagtail operational forecast flow opened from the dashboard.',ui.openPage,'Open page'),
+      moduleCard('cityclimate.cityclimatedatapage','🏙️','Climatologia urbana','Urban climate','Canal publico para series e parametros climaticos por cidade.','Public channel for city climate series and parameters.',ui.openPage,'Open page'),
+      moduleCard('geomanager.catalog','🗺️','GeoManager no globo','GeoManager on globe','Rasters oficiais entram no player temporal e na camada ativa.','Official rasters feed the time player and active layer.',ui.apply,'Apply'),
+      moduleCard('adminboundarymanager.boundaries','▦','Fronteiras oficiais','Official boundaries','Limites administrativos ClimWeb ligados sobre o globo.','ClimWeb administrative boundaries rendered on the globe.',ui.apply,'Apply'),
+      moduleCard('satellite_imagery.animations','🛰️','Satélite e animacao','Satellite and animation','Timeline usa imagens reais e fallback rotulado por GeoManager/NASA GIBS.','Timeline uses real imagery with labeled GeoManager/NASA GIBS fallback.',ui.apply,'Apply'),
+      moduleCard('cap.alerts','⚠️','Alertas CAP','CAP alerts','CAP GeoJSON/RSS/XML alimenta lista, marcadores e feed publico.','CAP GeoJSON/RSS/XML feeds list, markers, and public feed.',ui.apply,'Apply'),
+      moduleCard('stations.oscar_wmo','📍','Estacoes OSCAR/WMO','OSCAR/WMO stations','Pontos de observacao aparecem no globo via JSON/MVT.','Observation points appear on the globe through JSON/MVT.',ui.apply,'Apply'),
+      moduleCard('wdqms.quality','📡','Qualidade WDQMS','WDQMS quality','Monitoramento de transmissao e variaveis com relatorio operacional.','Transmission and variable quality monitoring with operational report.',ui.openPanel,'Open panel')
+    ];
+    const climwebSummaryMini=[
+      {label:L==='pt'?'funcoes':'functions', value:climwebModules.length, color:'#34d399'},
+      {label:'ready', value:stateCounts.ready||0, color:stateColor.ready},
+      {label:L==='pt'?'configurar':'configure', value:stateCounts.unconfigured||0, color:stateColor.unconfigured},
+      {label:'error', value:stateCounts.error||0, color:stateColor.error}
+    ];
+    const layerSource=(id)=>{
+      if(id==='rain') return 'ClimWeb GeoManager';
+      if(id==='borders') return 'ClimWeb AdminBoundary';
+      if(id==='alerts') return 'ClimWeb CAP / GDACS / USGS';
+      if(id==='stations') return 'OSCAR/WMO';
+      if(id==='temp') return 'Open-Meteo / NASA GIBS';
+      if(id==='wind'||id==='pressure'||id==='uv'||id==='aqi') return 'Open-Meteo';
+      return 'NASA GIBS / GeoManager';
+    };
+    const climwebLayerTools=this.LAYERS.map(l=>{
+      const on=!!aL[l.id];
+      const used=on||l.id==='temp';
+      const label=(L==='pt'?l.pt:l.en)+' · '+layerSource(l.id);
+      return {
+        label, swatch:l.swatch, used, color:used?'#34d399':'#8bbdad',
+        state:on?(L==='pt'?'em uso':'on'):(l.id==='temp'?(L==='pt'?'em painel':'in panel'):(L==='pt'?'disponivel':'ready')),
+        onClick:()=>this.toggleLayer(l.id),
+        style:`width:100%;display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:10px;border:1px solid ${used?'#34d39966':'#ffffff14'};background:${used?'#34d39914':'#ffffff07'};color:#cdeee0;text-align:left;cursor:pointer;`
+      };
+    });
+    const climwebActiveLayerCount=climwebLayerTools.filter(t=>t.used).length+'/'+climwebLayerTools.length;
+    const rowButton=(state)=>`width:100%;display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:11px;border:1px solid #ffffff14;background:#ffffff08;color:#cdeee0;text-align:left;cursor:pointer;`;
+    const modulePublicUrl=(m)=>this.publicEndpoint(m)||this.firstEndpoint(m);
+    const climwebCmsCards=climwebModules.filter(m=>m.group==='cms').map(m=>{
+      const url=modulePublicUrl(m);
+      return {title:m.label, count:moduleCount(m), url:compactUrl(url), style:rowButton(m.state), onOpen:()=>this.openUrl(url)};
+    });
+    const climwebInteractionCards=climwebModules.filter(m=>m.group==='public_interaction').map(m=>{
+      const unconfigured=m.state==='unconfigured';
+      const url=unconfigured?m.admin_url:modulePublicUrl(m);
+      const req=(m.items&&m.items[0]&&m.items[0].value)||'';
+      return {
+        title:m.label, state:moduleState(m), stateColor:moduleColor(m),
+        action:unconfigured?((L==='pt'?ui.configure:'Configure')+' · '+req):(compactUrl(url)||ui.openPage),
+        style:rowButton(m.state), onOpen:()=>this.openUrl(url)
+      };
+    });
+    const itemSummary=(m)=>((m&&m.items)||[]).slice(0,3).map(it=>it.label+': '+it.value).join(' · ');
+    const climwebPlatformCards=climwebModules.filter(m=>m.group==='platform').map(m=>{
+      const api=this.previewEndpoint(m)||this.firstEndpoint(m);
+      return {
+        title:m.label, meta:itemSummary(m)||compactUrl(api), action:this.previewEndpoint(m)?ui.test:ui.open,
+        style:opSecondary, onOpen:()=>this.previewEndpoint(m)?this.runClimwebEndpoint(m):this.openUrl(api)
+      };
+    });
+    const refreshSeconds=(overview&&overview.refresh_seconds)||600;
+    const climwebAutoRefresh=ui.autoRefresh+' '+Math.round(refreshSeconds/60)+'min';
+
+    // ---- Portal (services) section: every ClimWeb function surfaced as a plain-site action ----
+    const isPt=L==='pt';
+    const fmtHuman=(n)=>{ const v=+n; if(n==null||!isFinite(v)) return null;
+      if(v>=1000000) return isPt?(v/1000000).toFixed(1).replace('.',',')+' mi':(v/1000000).toFixed(1)+'M';
+      if(v>=1000) return isPt?(v/1000).toFixed(1).replace('.',',')+' mil':(v/1000).toFixed(1)+'k';
+      return String(Math.round(v)); };
+    const portalCardStyle="display:flex;flex-direction:column;gap:10px;padding:16px;border-radius:16px;background:#ffffff0a;border:1px solid #ffffff16;box-shadow:inset 0 1px 0 #ffffff10";
+    const portalBtn="align-self:flex-start;margin-top:auto;border:1px solid #34d399;background:#34d399;color:#061a14;border-radius:10px;padding:8px 14px;font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;font-weight:600;cursor:pointer;";
+    const portalBtnSoft="align-self:flex-start;margin-top:auto;border:1px solid #ffffff26;background:#ffffff0d;color:#dff8ec;border-radius:10px;padding:8px 14px;font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;font-weight:600;cursor:pointer;";
+    const portalBtnSoon="align-self:flex-start;margin-top:auto;border:1px dashed #ffffff22;background:transparent;color:#7fa295;border-radius:10px;padding:8px 14px;font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;font-weight:600;cursor:default;";
+    const liveCard=(key,icon,title,body,metric,metricLabel,action)=>{
+      const m=moduleBy(key);
+      return { icon,title,body, metric:metric==null?'':metric, metricLabel:metricLabel||'', hasMetric:metric!=null,
+        action, style:portalCardStyle, btnStyle:portalBtn,
+        // stub keeps the button functional (scroll/toggle by key) even when the
+        // backend overview is unreachable, e.g. running from GitHub Pages
+        onClick:()=>this.applyClimwebModule(m||{key:key, label:title, count:null, source:''}) };
+    };
+    const pageCard=(key,icon,title,body,action)=>{
+      const m=moduleBy(key);
+      const url=m?(this.publicEndpoint(m)||this.firstEndpoint(m)):null;
+      return { icon,title,body, metric:'', metricLabel:'', hasMetric:false, action,
+        style:portalCardStyle, btnStyle:portalBtnSoft, onClick:()=>this.openUrl(url) };
+    };
+    const portalCount=(key)=>{ const m=moduleBy(key); return m?m.count:null; };
+    const portalLiveCards=[
+      liveCard('forecastmanager.forecasts','🌦️', isPt?'Previsão nas cidades':'City forecasts', isPt?'O tempo agora e para as próximas horas, cidade por cidade.':'Current conditions and the hours ahead, city by city.', fmtHuman(portalCount('forecastmanager.forecasts')), isPt?'cidades':'cities', isPt?'Ver previsões':'See forecasts'),
+      liveCard('cap.alerts','⚠️', isPt?'Avisos em vigor':'Active warnings', isPt?'Alertas meteorológicos e ocorrências acompanhados em tempo real.':'Weather warnings and events tracked in real time.', String(counts.all), isPt?'avisos agora':'right now', isPt?'Ver avisos':'See warnings'),
+      liveCard('stations.oscar_wmo','📍', isPt?'Rede de estações':'Station network', isPt?'Estações de observação do mundo inteiro, direto no globo.':'Observation stations from around the world, on the globe.', fmtHuman(portalCount('stations.oscar_wmo')), isPt?'estações':'stations', isPt?'Ver no globo':'View on globe'),
+      liveCard('wdqms.quality','📈', isPt?'Qualidade da rede':'Network quality', isPt?'Acompanhamos continuamente o funcionamento das estações.':'We continuously monitor how stations are performing.', fmtHuman(portalCount('wdqms.quality')), isPt?'verificações':'checks', isPt?'Ver relatório':'View report'),
+      liveCard('geomanager.catalog','🌧️', isPt?'Mapa de chuva':'Rain map', isPt?'Veja onde está chovendo agora no globo interativo.':'See where it is raining right now on the interactive globe.', null, '', isPt?'Ver no globo':'View on globe'),
+      liveCard('satellite_imagery.animations','🛰️', isPt?'Imagem de satélite':'Satellite view', isPt?'As nuvens em movimento nas últimas horas, vistas do espaço.':'Clouds on the move over recent hours, seen from space.', null, '', isPt?'Assistir':'Watch'),
+      liveCard('adminboundarymanager.boundaries','🗺️', isPt?'Países e regiões':'Countries and regions', isPt?'Fronteiras desenhadas sobre o mapa para facilitar a leitura.':'Borders drawn on the map for easier reading.', fmtHuman(portalCount('adminboundarymanager.boundaries')), isPt?'países':'countries', isPt?'Mostrar no mapa':'Show on map'),
+      pageCard('weather.weatherdetailpage','🌤️', isPt?'Página do tempo':'Weather page', isPt?'A previsão completa em uma página pronta para compartilhar.':'The full forecast on a single, shareable page.', isPt?'Abrir página':'Open page'),
+      pageCard('cityclimate.cityclimatedatapage','🏙️', isPt?'Clima da sua cidade':'Your city climate', isPt?'Médias históricas e séries climáticas por cidade.':'Historical averages and climate series per city.', isPt?'Explorar':'Explore')
+    ];
+    const portalLink=(key,label)=>{
+      const m=moduleBy(key);
+      const url=m?modulePublicUrl(m):null;
+      // a link works whenever the public page exists; "coming soon" only when there is no page at all
+      const soon=!m||m.state==='unconfigured'||!url;
+      return { label, tag:soon?ui.soonLabel:'→',
+        style:`width:100%;display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:10px;border:1px solid ${soon?'#ffffff0c':'#ffffff16'};background:${soon?'#ffffff05':'#ffffff08'};color:${soon?'#7fa295':'#dff8ec'};text-align:left;cursor:${soon?'default':'pointer'};font-family:'IBM Plex Sans',sans-serif;font-size:13px;`,
+        onClick:()=>{ if(!soon) this.openUrl(url); } };
+    };
+    const portalNavGroups=[
+      { title:isPt?'Institucional':'About us', links:[ portalLink('home.homepage',isPt?'Página inicial':'Home'), portalLink('about.aboutpage',isPt?'Sobre nós':'About'), portalLink('organisation.organisationindexpage',isPt?'A organização':'The organisation'), portalLink('partners.partner',isPt?'Parceiros':'Partners'), portalLink('staff.staffpage',isPt?'Equipe':'Our team'), portalLink('projects.projectpage',isPt?'Projetos':'Projects') ] },
+      { title:isPt?'Notícias e mídia':'News and media', links:[ portalLink('news.newspage',isPt?'Notícias':'News'), portalLink('publications.publicationpage',isPt?'Publicações':'Publications'), portalLink('events.eventpage',isPt?'Agenda e eventos':'Events'), portalLink('mediacenter.mediaindexpage',isPt?'Central de mídia':'Media centre'), portalLink('videos.youtubeplaylist',isPt?'Vídeos':'Videos'), portalLink('webstories.webstorylistpage','Web stories') ] },
+      { title:isPt?'Produtos e serviços':'Products and services', links:[ portalLink('services.servicepage',isPt?'Serviços':'Services'), portalLink('products.productpage',isPt?'Produtos':'Products'), portalLink('products.productitempage',isPt?'Catálogo de produtos':'Product catalogue'), portalLink('glossary.glossaryitemdetailpage',isPt?'Glossário':'Glossary') ] },
+      { title:isPt?'Oportunidades':'Opportunities', links:[ portalLink('tenders.tenderdetailpage',isPt?'Licitações':'Tenders'), portalLink('vacancies.vacancydetailpage',isPt?'Trabalhe conosco':'Careers') ] }
+    ];
+    const supportCard=(key,icon,title,body,action)=>{
+      const m=moduleBy(key);
+      const soon=!m||m.state==='unconfigured'||!modulePublicUrl(m);
+      return { icon,title,body, action:soon?ui.soonLabel:action, style:portalCardStyle,
+        btnStyle:soon?portalBtnSoon:portalBtnSoft,
+        onClick:()=>{ if(!soon) this.openUrl(modulePublicUrl(m)); } };
+    };
+    const newsletterKey=(()=>{ const ks=['email_subscription.mauticmailinglistsubscriptionpage','email_subscription.mailchimpmailinglistsubscriptionpage','wagtail_newsletter.recipients']; const ready=ks.find(k=>{ const m=moduleBy(k); return m&&m.state!=='unconfigured'&&modulePublicUrl(m); }); return ready||ks[0]; })();
+    const portalSupportCards=[
+      supportCard('contact.contactpage','💬', isPt?'Fale conosco':'Contact us', isPt?'Tire dúvidas ou envie uma mensagem para a nossa equipe.':'Ask a question or send our team a message.', isPt?'Abrir contato':'Get in touch'),
+      supportCard('feedback.feedbackpage','📝', isPt?'Sua opinião':'Your feedback', isPt?'Conte o que está funcionando bem e o que pode melhorar.':'Tell us what works well and what could be better.', isPt?'Enviar opinião':'Send feedback'),
+      supportCard('data_request.datarequestpage','📂', isPt?'Solicitar dados':'Request data', isPt?'Peça dados históricos e relatórios sob medida.':'Request historical data and tailored reports.', isPt?'Fazer pedido':'Make a request'),
+      supportCard('surveys.surveypage','🗳️', isPt?'Pesquisas':'Surveys', isPt?'Participe das consultas públicas abertas.':'Take part in open public consultations.', isPt?'Participar':'Take part'),
+      supportCard(newsletterKey,'📮', isPt?'Boletim por e-mail':'Email bulletin', isPt?'Receba previsões e avisos direto na sua caixa de entrada.':'Get forecasts and warnings straight to your inbox.', isPt?'Assinar':'Subscribe'),
+      supportCard('wagtailzoom.settings','🎥', isPt?'Eventos online':'Online events', isPt?'Transmissões e webinars abertos ao público.':'Public livestreams and webinars.', isPt?'Ver agenda':'See schedule')
+    ];
+    const portalErrors=stateCounts.error||0;
+    const portalStatus=!overview
+      ? { color:'#38bdf8',
+          text:(isPt?'Painel em modo autônomo — exibindo fontes públicas ao vivo (NASA, Open-Meteo, GDACS, USGS). Conecte o servidor para ver previsões oficiais, estações e conteúdo do portal.':'Panel in standalone mode — showing live public sources (NASA, Open-Meteo, GDACS, USGS). Connect the server for official forecasts, stations and portal content.') }
+      : { color:portalErrors?'#f59e0b':'#34d399',
+          text:portalErrors
+            ? (isPt?'Parte dos serviços está em manutenção neste momento — nossa equipe já está cuidando disso.':'Some services are under maintenance right now — our team is on it.')
+            : (isPt?'Todos os serviços estão no ar. Previsões, mapas e avisos são atualizados automaticamente ao longo do dia.':'All services are up and running. Forecasts, maps and warnings refresh automatically throughout the day.') };
+
+    const formats=['JSON','GeoJSON','MVT','WMS','CAP','RSS','Wagtail API'];
+    const sources=['ClimWeb/WMO','ForecastManager','GeoManager','CAP','OSCAR/WMO','WDQMS','Open-Meteo','NASA GIBS','GDACS','USGS'];
+
+    const heroStats=[
+      {value:counts.all, label:L==='pt'?'Avisos ativos':'Active warnings'},
+      {value:forecastModule&&forecastModule.count!=null?forecastModule.count:'—', label:L==='pt'?'Cidades com previsão':'Cities with forecasts'},
+      {value:rasterRows.length||'—', label:L==='pt'?'Camadas de mapa':'Map layers'},
+      {value:stationModule&&stationModule.count!=null?stationModule.count:'—', label:L==='pt'?'Estações de observação':'Observation stations'}
+    ];
+    const globeTruth=[
+      {label:L==='pt'?'Avisos ativos':'Active warnings', value:counts.all, color:'#f97316'},
+      {label:L==='pt'?'Estações de observação':'Observation stations', value:stationModule&&stationModule.count!=null?stationModule.count:stationRows.length, color:'#67e8f9'},
+      {label:L==='pt'?'Cidades com previsão':'Cities with forecasts', value:forecastModule&&forecastModule.count!=null?forecastModule.count:'—', color:'#34d399'},
+      {label:L==='pt'?'Camadas de mapa':'Map layers', value:rasterRows.length||'—', color:'#38bdf8'}
+    ];
+    const globeTruthNote = L==='pt'
+      ? 'As camadas do globo usam dados oficiais e fontes públicas reconhecidas, sempre identificadas. Quando uma fonte está indisponível, a camada fica vazia até a próxima atualização.'
+      : 'Globe layers use official data and recognised public sources, always identified. When a source is unavailable, the layer stays empty until the next update.';
+
+    return {
+      ui, navItems, lang:L,
+      setPt:()=>this.setState({lang:'pt'}), setEn:()=>this.setState({lang:'en'}),
+      ptBtn:lb(L==='pt'), enBtn:lb(L==='en'),
+      toggleNotif:()=>{}, alertCount:counts.all,
+      globeRef:this.globeRef, globeTipRef:this.globeTipRef, satRef:this.satRef, trendRef:this.trendRef, pressRef:this.pressRef, clockRef:this.clockRef, rotIconRef:this.rotIconRef, windRef:this.windRef,
+      heroStats, globeTruth, globeTruthNote, topAlert,
+      zoomIn:()=>this.zoomIn(), zoomOut:()=>this.zoomOut(), resetGlobe:()=>this.resetGlobe(),
+      playing:this.state.playing, togglePlay:()=>this.togglePlay(), playIcon:this.state.playing?'⏸':'▶',
+      liveStamp, liveDate, liveSourceLine, isLatest, playerFrames, playerVal, onFrame:(e)=>this.onFrame(e),
+      stepBack:()=>this.stepFrame(-1), stepFwd:()=>this.stepFrame(1),
+      periodView, resView, opacity, onOpacity:(e)=>this.onOpacity(e),
+      periodLabel:this.state.period, resolution:this.state.resolution, stepLabel,
+      windDensView, windOn, cadenceShow:!this.state.activeLayers.wind,
+      liveBadge: isLatest?(L==='pt'?'Ao vivo':'Live'):(L==='pt'?'Reprodução':'Replay'),
+      liveColor: isLatest?'#34d399':'#fbbf24',
+      activeLayerName: layerCfg?(L==='pt'?layerCfg.pt:layerCfg.en):(L==='pt'?'Imagem de satélite':'Satellite imagery'),
+      satCardKicker, satLabel, satStatus, satRange,
+      activeLayerUnit: layerCfg?layerCfg.unit:'RGB',
+      legendGradient, legendMin: layerCfg?layerCfg.lo:(L==='pt'?'oceano':'ocean'), legendMax: layerCfg?layerCfg.hi:(L==='pt'?'nuvem':'cloud'),
+      layersView, alertsView, sevChips,
+      alertDetail, closeAlert:()=>this.closeAlert(), stopProp:(e)=>{ if(e&&e.stopPropagation) e.stopPropagation(); },
+      nowcastCity, cityOptions:quickCities, nowcastQuery, geoResults, hasGeoResults:geoResults.length>0, onNowcastQuery,
+      forecastDate, onForecastDate, maxDate, minDate, dayCard, hasDayCard:!!dayCard, dayCardEmpty:!!(dayCard&&!dayCard.loading&&dayCard.ok===false),
+      nc, nowcastBars, timelineHour:this.state.timelineHour, onTimeline:(e)=>this.onTimeline(e),
+      satMeta,
+      precipBars, tempLine, tempArea, tempDots, trendCols, trendHoverCol, onTrendLeave, trendStatus, trendLegendNote,
+      regionsView,
+      uv, aqi, windDir:windDirLabel, gust, pressure, pressPath, pressArea, pressDeltaLabel, pressDeltaColor, pressNoteDyn,
+      datasets, formats, sources,
+      climwebModules:climwebModulesView, climwebSummary, climwebGenerated:overview?this.fmtDateShort(overview.generated_at):'—',
+      climwebSummaryMini, climwebOperationalCards, climwebLayerTools, climwebCmsCards, climwebInteractionCards, climwebPlatformCards, climwebAutoRefresh, climwebActiveLayerCount,
+      portalLiveCards, portalNavGroups, portalSupportCards, portalStatus,
+      climwebGroupChips, climwebStateChips, climwebVisibleCount:climwebModulesView.length,
+      climwebSelected, climwebActions, climwebResult, climwebLoading:this.state.climwebActionLoading, climwebNoResult,
+      refreshClimweb:()=>this.fetchRealData()
+    };
+  }
+}
+</script>
+</body>
+</html>
